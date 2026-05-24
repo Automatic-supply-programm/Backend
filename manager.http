@@ -1,0 +1,39 @@
+### ==================== ЗАЯВКИ (входящие на пополнение/поступление) ====================
+
+### 1. Получить входящие заявки (типы REPLENISHMENT, RECEIPT, RETURN)
+GET {{base}}/requests/incoming?type=REPLENISHMENT&status=UNDER_CONSIDERATION
+Authorization: Bearer_{{token}}
+
+### 2. Одобрить заявку на пополнение
+POST {{base}}/requests/{{requestId}}/status?status=APPROVED&comment=Одобрено
+Authorization: Bearer_{{token}}
+
+### 3. Отклонить заявку
+POST {{base}}/requests/{{requestId}}/status?status=REJECTED&comment=Причина отклонения
+Authorization: Bearer_{{token}}
+
+### 4. Отправить заявку на доработку
+POST {{base}}/requests/{{requestId}}/status?status=SENT_FOR_REVISION&comment=Уточните количество
+Authorization: Bearer_{{token}}
+
+### ==================== ЖУРНАЛ СОБЫТИЙ ПО СВОИМ СКЛАДАМ ====================
+
+### 5. Получить журнал действий по подконтрольным складам
+GET {{base}}/manager/event-logs?startDate=2025-01-01&endDate=2026-12-31
+Authorization: Bearer_{{token}}
+
+### ==================== ПОЛЬЗОВАТЕЛИ (для страницы "Пользователи") ====================
+
+### 6. Получить список всех пользователей (без паролей)
+GET {{base}}/manager/users
+Authorization: Bearer_{{token}}
+
+### ==================== ПРОСМОТР СКЛАДА ====================
+
+### 7. Просмотр материалов (такой же как у работника склада)
+GET {{base}}/materials?archived=false
+Authorization: Bearer_{{token}}
+
+### 8. Просмотр дефицита
+GET {{base}}/materials/deficit
+Authorization: Bearer_{{token}}

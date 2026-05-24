@@ -1,0 +1,86 @@
+### ==================== АДМИНИСТРИРОВАНИЕ ПОЛЬЗОВАТЕЛЕЙ ====================
+
+### 1. Получить всех пользователей
+GET {{base}}/admin/users
+Authorization: Bearer_{{token}}
+
+### 2. Получить пользователя по ID
+GET {{base}}/admin/users/{{userId}}
+Authorization: Bearer_{{token}}
+
+### 3. Создать пользователя
+POST {{base}}/admin/users
+Authorization: Bearer_{{token}}
+Content-Type: application/json
+
+{
+  "login": "new_worker",
+  "fullName": "Новый Работник",
+  "password": "pass123",
+  "role": "WORKER",
+  "warehouseId": "WH001",
+  "productionLineIds": ["LINE_A"]
+}
+
+### 4. Обновить пользователя
+PUT {{base}}/admin/users/{{userId}}
+Authorization: Bearer_{{token}}
+Content-Type: application/json
+
+{
+  "login": "updated_login",
+  "fullName": "Обновлённое ФИО"
+}
+
+### 5. Сменить пароль пользователя
+POST {{base}}/admin/users/{{userId}}/change-password?newPassword=newSecret123
+Authorization: Bearer_{{token}}
+
+### 6. Заблокировать / разблокировать пользователя
+POST {{base}}/admin/users/{{userId}}/toggle?active=false
+Authorization: Bearer_{{token}}
+
+### 7. Удалить пользователя (soft delete)
+DELETE {{base}}/admin/users/{{userId}}
+Authorization: Bearer_{{token}}
+
+### ==================== ЖУРНАЛ СОБЫТИЙ ====================
+
+### 8. Получить события с фильтрацией
+GET {{base}}/event-logs?userId=&eventType=&startDate=2025-01-01&endDate=2026-12-31
+Authorization: Bearer_{{token}}
+
+### 9. Получить все возможные типы событий
+GET {{base}}/event-logs/types
+Authorization: Bearer_{{token}}
+
+### ==================== ДОПОЛНИТЕЛЬНЫЕ АДМИНСКИЕ ФУНКЦИИ ====================
+
+### 10. Получить последние действия пользователей (дашборд)
+GET {{base}}/dashboard/recent?limit=10
+Authorization: Bearer_{{token}}
+
+### 11. Получить все заявки (с фильтрацией)
+GET {{base}}/requests/all?archived=false&search=&type=&status=&startDate=&endDate=
+Authorization: Bearer_{{token}}
+
+### 12. Управление материалами (админ имеет полные права)
+### Создать материал
+POST {{base}}/materials
+Authorization: Bearer_{{token}}
+Content-Type: application/json
+
+{
+  "article": "ADMIN-MAT",
+  "name": "Создан админом",
+  "category": "CONSUMABLE",
+  "unit": "шт",
+  "currentStock": 0,
+  "criticalStock": 10,
+  "storageLocation": "Склад 1",
+  "warehouses": ["WH001"]
+}
+
+### Архивировать материал (только админ)
+DELETE {{base}}/materials/{{materialId}}
+Authorization: Bearer_{{token}}

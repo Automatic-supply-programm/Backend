@@ -1,0 +1,95 @@
+### ==================== АУТЕНТИФИКАЦИЯ (все роли) ====================
+
+### 1. Логин
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "login": "admin",
+  "password": "admin123"
+}
+
+### 2. Выход (требуется токен)
+POST {{base}}/auth/logout
+Authorization: Bearer_{{token}}
+
+### ==================== ДАШБОРД (все авторизованные) ====================
+
+### 3. Получить статистику согласно роли
+GET {{base}}/dashboard
+Authorization: Bearer_{{token}}
+
+### 4. Получить информацию о себе
+GET {{base}}/user/me
+Authorization: Bearer_{{token}}
+
+### ==================== МАТЕРИАЛЫ (все авторизованные) ====================
+
+### 5. Получить список материалов
+GET {{base}}/materials?archived=false&search=&category=&warehouseId=&status=
+Authorization: Bearer_{{token}}
+
+### 6. Получить дефицитные материалы
+GET {{base}}/materials/deficit
+Authorization: Bearer_{{token}}
+
+### 7. Получить материал по ID
+GET {{base}}/materials/{{materialId}}
+Authorization: Bearer_{{token}}
+
+### ==================== ЗАЯВКИ (все авторизованные) ====================
+
+### 8. Получить заявки, созданные текущим пользователем
+GET {{base}}/requests?archived=false
+Authorization: Bearer_{{token}}
+
+### 9. Создать заявку (тип зависит от роли)
+POST {{base}}/requests
+Authorization: Bearer_{{token}}
+Content-Type: application/json
+
+{
+  "type": "ISSUE",
+  "sourceId": "LINE_001",
+  "sourceName": "Участок A",
+  "destinationId": "worker_id",
+  "destinationName": "Иванов И.И.",
+  "items": [
+    {
+      "materialId": "mat_id",
+      "materialName": "Болт",
+      "quantity": 10,
+      "unit": "шт"
+    }
+  ],
+  "comment": "Срочно"
+}
+
+### 10. Редактировать заявку (только автор)
+PUT {{base}}/requests/{{requestId}}
+Authorization: Bearer_{{token}}
+Content-Type: application/json
+
+{
+  "items": [
+    {
+      "materialId": "mat_id",
+      "materialName": "Болт",
+      "quantity": 20,
+      "unit": "шт"
+    }
+  ],
+  "comment": "Изменил количество"
+}
+
+### 11. Изменить статус заявки (адресат или автор)
+POST {{base}}/requests/{{requestId}}/status?status=APPROVED&comment=Одобрено
+Authorization: Bearer_{{token}}
+
+### 12. Подтвердить получение (только EMPLOYEE для ISSUE)
+POST {{base}}/requests/{{requestId}}/confirm
+Authorization: Bearer_{{token}}
+
+### 13. Архивировать заявку (автор или адресат)
+POST {{base}}/requests/{{requestId}}/archive
+Authorization: Bearer_{{token}}

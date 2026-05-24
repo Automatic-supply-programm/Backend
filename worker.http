@@ -1,0 +1,99 @@
+### Базовый URL
+@base = http://localhost:8080/api
+@token = сюда_вставить_токен_работника_склада
+
+### ==================== ЗАЯВКИ (входящие) ====================
+
+### 1. Получить входящие заявки (на обеспечение)
+GET {{base}}/requests/incoming?search=&type=ISSUE&status=UNDER_CONSIDERATION&startDate=&endDate=
+Authorization: Bearer_{{token}}
+
+### 2. Одобрить заявку на выдачу (переводит в WAITING_CONFIRMATION)
+POST {{base}}/requests/{{requestId}}/status?status=APPROVED&comment=Материалы выданы
+Authorization: Bearer_{{token}}
+
+### 3. Отклонить заявку
+POST {{base}}/requests/{{requestId}}/status?status=REJECTED&comment=Нет на складе
+Authorization: Bearer_{{token}}
+
+### ==================== УПРАВЛЕНИЕ МАТЕРИАЛАМИ ====================
+
+### 4. Создать новый материал (WORKER может)
+POST {{base}}/materials
+Authorization: Bearer_{{token}}
+Content-Type: application/json
+
+{
+  "article": "MAT-WORKER",
+  "name": "Создано работником",
+  "category": "RAW_MATERIAL",
+  "unit": "кг",
+  "currentStock": 0,
+  "criticalStock": 50,
+  "storageLocation": "Стеллаж A",
+  "warehouses": ["WH001"]
+}
+
+### 5. Обновить материал (кроме архивирования)
+PUT {{base}}/materials/{{materialId}}
+Authorization: Bearer_{{token}}
+Content-Type: application/json
+
+{
+  "criticalStock": 80,
+  "storageLocation": "Стеллаж B"
+}
+
+### 6. Добавить партию материала
+POST {{base}}/materials/{{materialId}}/batch
+Authorization: Bearer_{{token}}
+Content-Type: application/json
+
+{
+  "initialQuantity": 200,
+  "currentQuantity": 200,
+  "storageLocation": "Стеллаж B-2"
+}
+
+### ==================== ЗАЯВКИ НА ПОПОЛНЕНИЕ ====================
+### 7. Создать заявку на пополнение (тип REPLENISHMENT)
+POST {{base}}/requests
+Authorization: Bearer_{{token}}
+Content-Type: application/json
+
+{
+  "type": "REPLENISHMENT",
+  "sourceId": "WH001",
+  "sourceName": "Склад №1",
+  "destinationId": "manager_id",
+  "destinationName": "Менеджер Петров",
+  "items": [
+    {
+      "materialId": "mat_id",
+      "materialName": "Материал",
+      "quantity": 100,
+      "unit": "шт"
+    }
+  ]
+}
+
+### 8. Создать заявку на оформление поступления (тип RECEIPT)
+POST {{base}}/requests
+Authorization: Bearer_{{token}}
+Content-Type: application/json
+
+{
+  "type": "RECEIPT",
+  "sourceId": "WH001",
+  "sourceName": "Склад №1",
+  "destinationId": "manager_id",
+  "destinationName": "Менеджер Петров",
+  "items": [
+    {
+      "materialId": "mat_id",
+      "materialName": "Материал",
+      "quantity": 300,
+      "unit": "шт"
+    }
+  ]
+}

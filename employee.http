@@ -1,0 +1,74 @@
+### ==================== ЗАЯВКИ ====================
+
+### 1. Создать заявку на выдачу (тип ISSUE)
+POST {{base}}/requests
+Authorization: Bearer_{{token}}
+Content-Type: application/json
+
+{
+  "type": "ISSUE",
+  "sourceId": "LINE_001",
+  "sourceName": "Участок сборки",
+  "destinationId": "worker_id",
+  "destinationName": "Иванов И.И. (работник склада)",
+  "items": [
+    {
+      "materialId": "mat_id",
+      "materialName": "Болт М10",
+      "quantity": 50,
+      "unit": "шт"
+    }
+  ],
+  "comment": "Для ремонта станка"
+}
+
+### 2. Создать заявку на возврат остатка (тип RETURN)
+POST {{base}}/requests
+Authorization: Bearer_{{token}}
+Content-Type: application/json
+
+{
+  "type": "RETURN",
+  "sourceId": "LINE_001",
+  "sourceName": "Участок сборки",
+  "destinationId": "worker_id",
+  "destinationName": "Иванов И.И.",
+  "items": [
+    {
+      "materialId": "mat_id",
+      "materialName": "Болт М10",
+      "quantity": 10,
+      "unit": "шт"
+    }
+  ],
+  "comment": "Возврат излишка"
+}
+
+### 3. Получить свои заявки (включая историю)
+GET {{base}}/requests?archived=false
+Authorization: Bearer_{{token}}
+
+### 4. Редактировать заявку (только в статусе UNDER_CONSIDERATION)
+PUT {{base}}/requests/{{requestId}}
+Authorization: Bearer_{{token}}
+Content-Type: application/json
+
+{
+  "items": [
+    {
+      "materialId": "mat_id",
+      "materialName": "Болт М10",
+      "quantity": 30,
+      "unit": "шт"
+    }
+  ],
+  "comment": "Изменил количество"
+}
+
+### 5. Отменить заявку (установить статус CANCELLED)
+POST {{base}}/requests/{{requestId}}/status?status=CANCELLED&comment=Отмена
+Authorization: Bearer_{{token}}
+
+### 6. Подтвердить получение материалов (после одобрения работником склада)
+POST {{base}}/requests/{{requestId}}/confirm
+Authorization: Bearer_{{token}}

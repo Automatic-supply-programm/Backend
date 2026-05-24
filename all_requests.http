@@ -1,0 +1,474 @@
+### ============================================================
+### Файл: all_requests.http
+### Базовый URL: http://localhost:8080/api
+### Все защищённые запросы требуют заголовок Authorization: Bearer_<токен>
+### Префикс токена: Bearer_ (с подчёркиванием)
+### ============================================================
+
+### --- ПЕРЕМЕННЫЕ -------------------------------------------------
+@base = http://localhost:8080/api
+@tokenAdmin = сюда_вставить_токен_админа
+@tokenWorker = сюда_вставить_токен_работника_склада
+@tokenEmployee = сюда_вставить_токен_сотрудника_участка
+@tokenManager = сюда_вставить_токен_менеджера
+
+### ============================================================
+### 1. АВТОРИЗАЦИЯ (ТЗ п.1)
+### ============================================================
+
+### 1.1 Логин – получение JWT-токена
+# ТЗ: форма авторизации, поля логин/пароль, регистрация отсутствует
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "login": "admin",
+  "password": "admin123"
+}
+# Ответ содержит токен, который нужно скопировать в переменную
+
+### 1.2 Выход из системы (для любого авторизованного пользователя)
+# ТЗ: фиксация события выхода в журнале
+POST {{base}}/auth/logout
+Authorization: Bearer_{{tokenAdmin}}
+
+### ============================================================
+### 2. АДМИНИСТРАТОР (ТЗ раздел 1)
+### Доступные страницы: Главная, Склад, Заявки, Пользователи, Журнал событий
+### ============================================================
+
+### --- Главная (ТЗ 1.1) ---
+### 2.1 Получить карточки с ключевыми показателями (дашборд)
+# ТЗ: карточки – Пользователи (всего/активных), Материалы, Заявки (активные), Дефицит
+GET {{base}}/dashboard
+Authorization: Bearer_{{tokenAdmin}}
+
+### 2.2 Таблица «Последние действия пользователей»
+# ТЗ: колонки Дата/время, Пользователь, Роль, Описание события
+GET {{base}}/dashboard/recent?limit=10
+Authorization: Bearer_{{tokenAdmin}}
+
+### --- Склад (ТЗ 1.2) ---
+### 2.3 Получить список материалов с фильтрацией
+# ТЗ: поиск по артикулу/наименованию, фильтры: склад, категория, статус
+GET {{base}}/materials?archived=false&search=труба&category=RAW_MATERIAL&warehouseId=WH001&status=LOW
+Authorization: Bearer_{{tokenAdmin}}
+
+### 2.4 Получить дефицитные материалы
+# ТЗ: колонка Дефицит – материалы с критическим или нулевым остатком
+GET {{base}}/materials/deficit
+Authorization: Bearer_{{tokenAdmin}}
+
+### 2.5 Получить карточку материала по ID
+# ТЗ: карточка товара с полями: наименование, артикул, категория, ед.изм., остатки, статус, склады, место хранения, даты
+GET {{base}}/materials/{{materialId}}
+Authorization: Bearer_{{tokenAdmin}}
+
+### 2.6 Создать новый материал (админ)
+# ТЗ: кнопка «Добавить материал»; обязательные поля (*)
+POST {{base}}/materials
+Authorization: Bearer_{{tokenAdmin}}
+Content-Type: application/json
+
+{
+  "article": "MAT-ADMIN",
+  "name": "Материал от админа",
+  "category": "CONSUMABLE",
+  "unit": "шт",
+  "currentStock": 0,
+  "criticalStock": 10,
+  "storageLocation": "Стеллаж A",
+  "warehouses": ["WH001"]
+}
+
+### 2.7 Редактировать карточку материала
+# ТЗ: кнопка «Редактировать» – изменение всех полей
+PUT {{base}}/materials/{{materialId}}
+Authorization: Bearer_{{tokenAdmin}}
+Content-Type: application/json
+
+{
+  "criticalStock": 20,
+  "storageLocation": "Стеллаж B"
+}
+
+### 2.8 Добавить партию материала (история партий)
+# ТЗ: таблица «История партий» с колонками: № партии, дата поступления, количество, текущий остаток партии, место хранения, срок годности, акт, принял, подтвердил
+POST {{base}}/materials/{{materialId}}/batch
+Authorization: Bearer_{{tokenAdmin}}
+Content-Type: application/json
+
+{
+  "initialQuantity": 500,
+  "currentQuantity": 500,
+  "storageLocation": "Стеллаж B-2",
+  "expiryDate": "2028-12-31T00:00:00",
+  "receiptActNumber": "АП-001",
+  "acceptedByUserId": "user_id",
+  "acceptedByName": "Иванов И.И.",
+  "confirmedByUserId": "manager_id",
+  "confirmedByName": "Петров П.П."
+}
+
+### 2.9 Архивировать карточку материала
+# ТЗ: кнопка «Архивировать» – карточка перестаёт отображаться в главной таблице
+DELETE {{base}}/materials/{{materialId}}
+Authorization: Bearer_{{tokenAdmin}}
+
+### --- Заявки (ТЗ 1.3) ---
+### 2.10 Получить все заявки (для админа) с фильтрацией
+# ТЗ: панель управления – поиск, фильтры по типу, статусу, периоду, складу/участку
+GET {{base}}/requests/all?archived=false&search=REQ&type=ISSUE&status=APPROVED&startDate=2025-01-01&endDate=2026-12-31
+Authorization: Bearer_{{tokenAdmin}}
+
+### 2.11 Создать заявку (админ может любую)
+# ТЗ: кнопка «Создать заявку», поля: тип, источник, адресат, список материалов
+POST {{base}}/requests
+Authorization: Bearer_{{tokenAdmin}}
+Content-Type: application/json
+
+{
+  "type": "REPLENISHMENT",
+  "sourceId": "WH001",
+  "sourceName": "Склад №1",
+  "destinationId": "manager_id",
+  "destinationName": "Менеджер Петров",
+  "items": [
+    {
+      "materialId": "mat_id",
+      "materialName": "Материал",
+      "quantity": 100,
+      "unit": "шт"
+    }
+  ],
+  "comment": "Пополнение склада"
+}
+
+### 2.12 Изменить статус заявки (админ)
+# ТЗ: статусы для разных типов заявок (одобрить, отклонить, отправить на доработку, отменить)
+POST {{base}}/requests/{{requestId}}/status?status=APPROVED&comment=Одобрено
+Authorization: Bearer_{{tokenAdmin}}
+
+### --- Пользователи (ТЗ 1.4) ---
+### 2.13 Получить всех пользователей
+# ТЗ: таблица пользователей – ФИО, логин, роль, статус доступа, дата создания, последний вход
+GET {{base}}/admin/users
+Authorization: Bearer_{{tokenAdmin}}
+
+### 2.14 Создать пользователя (админ)
+# ТЗ: кнопка «Добавить пользователя», поля: ФИО, логин, пароль, роль
+POST {{base}}/admin/users
+Authorization: Bearer_{{tokenAdmin}}
+Content-Type: application/json
+
+{
+  "login": "new_user",
+  "fullName": "Новый Пользователь",
+  "password": "pass123",
+  "role": "WORKER",
+  "warehouseId": "WH001"
+}
+
+### 2.15 Редактировать пользователя
+# ТЗ: кнопка «Редактировать» – изменение ФИО, логина, роли
+PUT {{base}}/admin/users/{{userId}}
+Authorization: Bearer_{{tokenAdmin}}
+Content-Type: application/json
+
+{
+  "fullName": "Обновлённое ФИО",
+  "login": "new_login"
+}
+
+### 2.16 Сменить пароль пользователя
+# ТЗ: кнопка «Сменить пароль» (пароль не отображается в открытом виде)
+POST {{base}}/admin/users/{{userId}}/change-password?newPassword=newSecret123
+Authorization: Bearer_{{tokenAdmin}}
+
+### 2.17 Приостановить / восстановить доступ
+# ТЗ: кнопки «Приостановить доступ» / «Восстановить доступ»
+POST {{base}}/admin/users/{{userId}}/toggle?active=false
+Authorization: Bearer_{{tokenAdmin}}
+
+### 2.18 Удалить пользователя (soft delete)
+# ТЗ: кнопка «Удалить» – действия сохраняются в журнале, вход невозможен
+DELETE {{base}}/admin/users/{{userId}}
+Authorization: Bearer_{{tokenAdmin}}
+
+### --- Журнал событий (ТЗ 1.5) ---
+### 2.19 Получить журнал событий с фильтрацией
+# ТЗ: панель управления – поиск, фильтры по пользователю, роли, типу события, периоду
+GET {{base}}/event-logs?userId=&eventType=LOGIN&startDate=2025-01-01&endDate=2026-12-31
+Authorization: Bearer_{{tokenAdmin}}
+
+### 2.20 Получить все возможные типы событий
+# ТЗ: типы: Вход, Заявка, Склад, Пользователь, Поступление и др.
+GET {{base}}/event-logs/types
+Authorization: Bearer_{{tokenAdmin}}
+
+### ============================================================
+### 3. РАБОТНИК СКЛАДА (ТЗ раздел 2)
+### Доступные страницы: Главная, Склад, Заявки и поступления
+### ============================================================
+
+### --- Главная (ТЗ 2.1) ---
+### 3.1 Получить карточки показателей для работника склада
+# ТЗ: карточки – Заявки на обеспечение (ожидают обработки), Поступления (ожидают оформления), Материалы (на складе), Дефицит
+GET {{base}}/dashboard
+Authorization: Bearer_{{tokenWorker}}
+
+### 3.2 Таблица «Последние складские операции»
+# ТЗ: колонки – дата/время, материал, тип операции, количество, документ, статус
+# (эндпоинт может быть /dashboard/operations или /materials/operations, но по умолчанию используем /dashboard/recent для всех)
+GET {{base}}/dashboard/recent?limit=10
+Authorization: Bearer_{{tokenWorker}}
+
+### --- Склад (ТЗ 2.2) ---
+### 3.3 Получить список материалов (работник склада)
+# ТЗ: таблица материалов с колонками (чекбокс, артикул, наименование, ед.изм., остаток, статус, место хранения, действия)
+GET {{base}}/materials?archived=false
+Authorization: Bearer_{{tokenWorker}}
+
+### 3.4 Создать материал (работник склада)
+# ТЗ: кнопка «Добавить материал», обязательные поля (*)
+POST {{base}}/materials
+Authorization: Bearer_{{tokenWorker}}
+Content-Type: application/json
+
+{
+  "article": "MAT-WORKER",
+  "name": "Создано работником",
+  "category": "RAW_MATERIAL",
+  "unit": "кг",
+  "currentStock": 0,
+  "criticalStock": 50,
+  "storageLocation": "Стеллаж A",
+  "warehouses": ["WH001"]
+}
+
+### 3.5 Редактировать материал (работник склада)
+# ТЗ: кнопка «Редактировать» – изменение данных, но не истории партий
+PUT {{base}}/materials/{{materialId}}
+Authorization: Bearer_{{tokenWorker}}
+Content-Type: application/json
+
+{
+  "criticalStock": 80,
+  "storageLocation": "Стеллаж B"
+}
+
+### 3.6 Добавить партию материала (поступление)
+# ТЗ: таблица «История партий» – заполняется при поступлении
+POST {{base}}/materials/{{materialId}}/batch
+Authorization: Bearer_{{tokenWorker}}
+Content-Type: application/json
+
+{
+  "initialQuantity": 200,
+  "currentQuantity": 200,
+  "storageLocation": "Стеллаж B-2",
+  "receiptActNumber": "АП-123"
+}
+
+### --- Заявки и поступления (ТЗ 2.3) ---
+### 3.7 Получить входящие заявки на обеспечение (для работника склада)
+# ТЗ: заявки на выдачу (тип ISSUE) со статусом «На рассмотрении»
+GET {{base}}/requests/incoming?type=ISSUE&status=UNDER_CONSIDERATION
+Authorization: Bearer_{{tokenWorker}}
+
+### 3.8 Одобрить заявку на выдачу
+# ТЗ: кнопка «Одобрить» – заявка переходит в статус «Одобрена» (WAITING_CONFIRMATION)
+POST {{base}}/requests/{{requestId}}/status?status=APPROVED&comment=Выдано
+Authorization: Bearer_{{tokenWorker}}
+
+### 3.9 Отклонить заявку
+# ТЗ: кнопка «Отклонить» – заявка получает статус «Отклонена»
+POST {{base}}/requests/{{requestId}}/status?status=REJECTED&comment=Нет на складе
+Authorization: Bearer_{{tokenWorker}}
+
+### 3.10 Создать заявку на пополнение (работник склада)
+# ТЗ: кнопка «Создать заявку на пополнение» (тип REPLENISHMENT)
+POST {{base}}/requests
+Authorization: Bearer_{{tokenWorker}}
+Content-Type: application/json
+
+{
+  "type": "REPLENISHMENT",
+  "sourceId": "WH001",
+  "sourceName": "Склад №1",
+  "destinationId": "manager_id",
+  "destinationName": "Менеджер Петров",
+  "items": [
+    {
+      "materialId": "mat_id",
+      "materialName": "Материал",
+      "quantity": 100,
+      "unit": "шт"
+    }
+  ],
+  "comment": "Необходимо пополнить"
+}
+
+### 3.11 Создать заявку на оформление поступления (работник склада)
+# ТЗ: кнопка «Оформить поступление» (тип RECEIPT)
+POST {{base}}/requests
+Authorization: Bearer_{{tokenWorker}}
+Content-Type: application/json
+
+{
+  "type": "RECEIPT",
+  "sourceId": "WH001",
+  "sourceName": "Склад №1",
+  "destinationId": "manager_id",
+  "destinationName": "Менеджер Петров",
+  "items": [
+    {
+      "materialId": "mat_id",
+      "materialName": "Материал",
+      "quantity": 300,
+      "unit": "шт"
+    }
+  ]
+}
+
+### ============================================================
+### 4. СОТРУДНИК ПРОИЗВОДСТВЕННОГО УЧАСТКА (ТЗ раздел 3)
+### Доступные страницы: Главная
+### ============================================================
+
+### --- Главная (ТЗ 3.1) ---
+### 4.1 Получить карточки статистики по своим заявкам
+# ТЗ: карточки – Всего активных заявок, На рассмотрении, Одобрено (ожидают подтверждения), Отклонено
+GET {{base}}/dashboard
+Authorization: Bearer_{{tokenEmployee}}
+
+### 4.2 Таблица «Мои актуальные заявки»
+# ТЗ: колонки – №, тип, дата, заявитель, источник, адресат, позиции, статус, действия
+GET {{base}}/requests?archived=false
+Authorization: Bearer_{{tokenEmployee}}
+
+### 4.3 Создать заявку на обеспечение (выдачу)
+# ТЗ: кнопка «Создать заявку на обеспечение», поля: производственный участок, адресат, список материалов
+POST {{base}}/requests
+Authorization: Bearer_{{tokenEmployee}}
+Content-Type: application/json
+
+{
+  "type": "ISSUE",
+  "sourceId": "LINE_001",
+  "sourceName": "Участок сборки",
+  "destinationId": "worker_id",
+  "destinationName": "Иванов И.И. (работник склада)",
+  "items": [
+    {
+      "materialId": "mat_id",
+      "materialName": "Болт М10",
+      "quantity": 50,
+      "unit": "шт"
+    }
+  ],
+  "comment": "Для ремонта"
+}
+
+### 4.4 Создать заявку на возврат остатка
+# ТЗ: кнопка «Создать заявку на возврат остатка» (тип RETURN)
+POST {{base}}/requests
+Authorization: Bearer_{{tokenEmployee}}
+Content-Type: application/json
+
+{
+  "type": "RETURN",
+  "sourceId": "LINE_001",
+  "sourceName": "Участок сборки",
+  "destinationId": "worker_id",
+  "destinationName": "Иванов И.И.",
+  "items": [
+    {
+      "materialId": "mat_id",
+      "materialName": "Болт М10",
+      "quantity": 10,
+      "unit": "шт"
+    }
+  ],
+  "comment": "Возврат излишка"
+}
+
+### 4.5 Редактировать заявку (только в статусе «На рассмотрении»)
+# ТЗ: кнопка «Редактировать» (если статус На рассмотрении)
+PUT {{base}}/requests/{{requestId}}
+Authorization: Bearer_{{tokenEmployee}}
+Content-Type: application/json
+
+{
+  "items": [
+    {
+      "materialId": "mat_id",
+      "materialName": "Болт М10",
+      "quantity": 30,
+      "unit": "шт"
+    }
+  ],
+  "comment": "Изменил количество"
+}
+
+### 4.6 Отменить заявку
+# ТЗ: кнопка «Отменить» – статус «Отменена», заявка архивируется
+POST {{base}}/requests/{{requestId}}/status?status=CANCELLED&comment=Отмена
+Authorization: Bearer_{{tokenEmployee}}
+
+### 4.7 Подтвердить получение материалов (после одобрения работником склада)
+# ТЗ: кнопка «Подтвердить» – заявка переходит в «Подтверждена», материалы списываются по FIFO
+POST {{base}}/requests/{{requestId}}/confirm
+Authorization: Bearer_{{tokenEmployee}}
+
+### ============================================================
+### 5. МЕНЕДЖЕР (ТЗ раздел 4)
+### Доступные страницы: Главная, Склад, Заявки и поступления, Пользователи
+### ============================================================
+
+### --- Главная (ТЗ 4.1) ---
+### 5.1 Получить карточки статистики для менеджера
+# ТЗ: карточки – Заявки на пополнение, На рассмотрении, Одобрено, Отклонено, Дефицит
+GET {{base}}/dashboard
+Authorization: Bearer_{{tokenManager}}
+
+### 5.2 Таблица «Актуальные заявки на пополнение»
+# ТЗ: отображаются только заявки типа «На пополнение»
+GET {{base}}/requests/incoming?type=REPLENISHMENT
+Authorization: Bearer_{{tokenManager}}
+
+### --- Склад (ТЗ 4.2) ---
+### 5.3 Просмотр склада (аналогично работнику склада)
+GET {{base}}/materials
+Authorization: Bearer_{{tokenManager}}
+
+### --- Заявки и поступления (ТЗ 4.3) ---
+### 5.4 Получить все входящие заявки для менеджера (типы REPLENISHMENT, RECEIPT, RETURN)
+# ТЗ: панель управления – поиск, фильтры по статусу, периоду, складу
+GET {{base}}/requests/incoming?type=REPLENISHMENT&status=UNDER_CONSIDERATION
+Authorization: Bearer_{{tokenManager}}
+
+### 5.5 Одобрить заявку (менеджер)
+POST {{base}}/requests/{{requestId}}/status?status=APPROVED&comment=Одобрено
+Authorization: Bearer_{{tokenManager}}
+
+### 5.6 Отклонить заявку с комментарием
+POST {{base}}/requests/{{requestId}}/status?status=REJECTED&comment=Причина отказа
+Authorization: Bearer_{{tokenManager}}
+
+### 5.7 Отправить заявку на доработку
+# ТЗ: кнопка «Отправить на доработку» (статус SENT_FOR_REVISION)
+POST {{base}}/requests/{{requestId}}/status?status=SENT_FOR_REVISION&comment=Уточните количество
+Authorization: Bearer_{{tokenManager}}
+
+### --- Пользователи (ТЗ 4.1 – раздел «Пользователи» у менеджера) ---
+### 5.8 Получить список пользователей (менеджер видит всех)
+# ТЗ: страница «Пользователи» для менеджера
+GET {{base}}/manager/users
+Authorization: Bearer_{{tokenManager}}
+
+### --- Журнал действий для менеджера (ТЗ 4.4) ---
+### 5.9 Получить журнал действий по подконтрольным складам
+# ТЗ: таблица с колонками: дата/время, работник склада, склад, производственный участок, тип события, объект, №, описание, результат
+GET {{base}}/manager/event-logs?startDate=2025-01-01&endDate=2026-12-31
+Authorization: Bearer_{{tokenManager}}
