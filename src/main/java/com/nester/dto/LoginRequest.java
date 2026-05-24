@@ -1,4 +1,3 @@
-// LoginRequest.java
 package com.nester.dto;
 
 import lombok.Data;
