@@ -12,13 +12,13 @@ import com.nester.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/admin")
@@ -26,13 +26,29 @@ import java.util.List;
 public class AdminController {
     private final UserService userService;
     private final EventLogService eventLogService;
-    private final PasswordEncoder passwordEncoder;
     private final ObjectMapper objectMapper;
 
     @GetMapping("/users")
-    public void getAllUsers(HttpServletResponse response) throws IOException {
+    public void getAllUsers(@RequestParam(required = false) String search,
+                            @RequestParam(required = false) String role,
+                            @RequestParam(required = false) Boolean active,
+                            HttpServletResponse response) throws IOException {
         response.setContentType("application/json;charset=utf-8");
         List<User> users = userService.findAll();
+        if (search != null && !search.isEmpty()) {
+            String q = search.toLowerCase();
+            users = users.stream()
+                    .filter(u -> (u.getFullName() != null && u.getFullName().toLowerCase().contains(q)) ||
+                                 (u.getLogin() != null && u.getLogin().toLowerCase().contains(q)))
+                    .collect(Collectors.toList());
+        }
+        if (role != null && !role.isEmpty()) {
+            users = users.stream().filter(u -> role.equals(u.getRole())).collect(Collectors.toList());
+        }
+        if (active != null) {
+            users = users.stream().filter(u -> u.isActive() == active).collect(Collectors.toList());
+        }
+        users.forEach(u -> u.setPassword(null));
         objectMapper.writeValue(response.getWriter(), new ResponseResult<>(null, users));
     }
 
@@ -41,6 +57,7 @@ public class AdminController {
         response.setContentType("application/json;charset=utf-8");
         try {
             User user = userService.findById(id);
+            user.setPassword(null);
             objectMapper.writeValue(response.getWriter(), new ResponseResult<>(null, user));
         } catch (IllegalArgumentException e) {
             response.setStatus(HttpStatus.BAD_REQUEST.value());
@@ -57,7 +74,7 @@ public class AdminController {
             User user = new User();
             user.setLogin(userRequest.getLogin());
             user.setFullName(userRequest.getFullName());
-            user.setPassword(passwordEncoder.encode(userRequest.getPassword()));
+            user.setPassword(userRequest.getPassword()); // кодирование выполняется в UserServiceImpl.create()
             user.setRole(userRequest.getRole());
             user.setActive(true);
 
@@ -72,13 +89,14 @@ public class AdminController {
             }
 
             User created = userService.create(user);
+            created.setPassword(null);
 
             // Логируем создание пользователя
             JwtUser jwtUser = (JwtUser) auth.getPrincipal();
             EventLog eventLog = new EventLog();
             eventLog.setTimestamp(LocalDateTime.now());
             eventLog.setUserId(jwtUser.getId());
-            eventLog.setUserFullName(jwtUser.getUsername());
+            eventLog.setUserFullName(jwtUser.getFullName());
             eventLog.setUserRole("ADMIN");
             eventLog.setEventType("USER_CREATED");
             eventLog.setObjectType("USER");
@@ -101,13 +119,14 @@ public class AdminController {
         response.setContentType("application/json;charset=utf-8");
         try {
             User updated = userService.update(id, user);
+            updated.setPassword(null);
 
             // Логируем изменение
             JwtUser jwtUser = (JwtUser) auth.getPrincipal();
             EventLog eventLog = new EventLog();
             eventLog.setTimestamp(LocalDateTime.now());
             eventLog.setUserId(jwtUser.getId());
-            eventLog.setUserFullName(jwtUser.getUsername());
+            eventLog.setUserFullName(jwtUser.getFullName());
             eventLog.setUserRole("ADMIN");
             eventLog.setEventType("USER_UPDATED");
             eventLog.setObjectType("USER");
@@ -131,7 +150,7 @@ public class AdminController {
         response.setContentType("application/json;charset=utf-8");
         try {
             User user = userService.findById(id);
-            user.setPassword(passwordEncoder.encode(newPassword));
+            user.setPassword(newPassword); // кодирование выполняется в UserServiceImpl.update()
             userService.update(id, user);
 
             // Логируем смену пароля
@@ -139,7 +158,7 @@ public class AdminController {
             EventLog eventLog = new EventLog();
             eventLog.setTimestamp(LocalDateTime.now());
             eventLog.setUserId(jwtUser.getId());
-            eventLog.setUserFullName(jwtUser.getUsername());
+            eventLog.setUserFullName(jwtUser.getFullName());
             eventLog.setUserRole("ADMIN");
             eventLog.setEventType("PASSWORD_CHANGED");
             eventLog.setObjectType("USER");
@@ -162,13 +181,14 @@ public class AdminController {
                                  HttpServletResponse response) throws IOException {
         response.setContentType("application/json;charset=utf-8");
         User user = userService.changeActive(id, active);
+        user.setPassword(null);
 
         // Логируем изменение статуса доступа
         JwtUser jwtUser = (JwtUser) auth.getPrincipal();
         EventLog eventLog = new EventLog();
         eventLog.setTimestamp(LocalDateTime.now());
         eventLog.setUserId(jwtUser.getId());
-        eventLog.setUserFullName(jwtUser.getUsername());
+        eventLog.setUserFullName(jwtUser.getFullName());
         eventLog.setUserRole("ADMIN");
         eventLog.setEventType(active ? "ACCESS_RESTORED" : "ACCESS_SUSPENDED");
         eventLog.setObjectType("USER");
@@ -185,13 +205,14 @@ public class AdminController {
         response.setContentType("application/json;charset=utf-8");
         try {
             User deleted = userService.delete(id);
+            deleted.setPassword(null);
 
             // Логируем удаление
             JwtUser jwtUser = (JwtUser) auth.getPrincipal();
             EventLog eventLog = new EventLog();
             eventLog.setTimestamp(LocalDateTime.now());
             eventLog.setUserId(jwtUser.getId());
-            eventLog.setUserFullName(jwtUser.getUsername());
+            eventLog.setUserFullName(jwtUser.getFullName());
             eventLog.setUserRole("ADMIN");
             eventLog.setEventType("USER_DELETED");
             eventLog.setObjectType("USER");

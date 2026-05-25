@@ -84,7 +84,7 @@ public class AuthController {
             EventLog eventLog = new EventLog();
             eventLog.setTimestamp(LocalDateTime.now());
             eventLog.setUserId(jwtUser.getId());
-            eventLog.setUserFullName(jwtUser.getUsername());
+            eventLog.setUserFullName(jwtUser.getFullName());
             eventLog.setUserRole(jwtUser.getAuthorities().iterator().next().getAuthority());
             eventLog.setEventType("LOGOUT");
             eventLog.setDescription("Пользователь вышел из системы");

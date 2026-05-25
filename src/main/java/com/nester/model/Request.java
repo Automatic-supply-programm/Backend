@@ -43,6 +43,8 @@ public class Request {
 
     private List<RequestItem> items = new ArrayList<>();
 
+    private String orderNumber;  // для RECEIPT: по какому заказу данная поставка
+
     private String comment;
     private boolean archived = false;
 }

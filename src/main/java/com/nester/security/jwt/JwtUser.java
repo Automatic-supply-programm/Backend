@@ -16,12 +16,14 @@ public class JwtUser implements UserDetails {
     @JsonIgnore
     private String id;
     private String login;
+    private String fullName;
     private String password;
     private List<GrantedAuthority> authorities = new ArrayList<>();
 
     public JwtUser(User user) {
         this.id = user.getId();
         this.login = user.getLogin();
+        this.fullName = user.getFullName();
         this.password = user.getPassword();
 
         GrantedAuthority authority = new SimpleGrantedAuthority("ROLE_" + user.getRole());

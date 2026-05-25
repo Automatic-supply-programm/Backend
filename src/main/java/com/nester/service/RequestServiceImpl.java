@@ -70,9 +70,13 @@ public class RequestServiceImpl implements RequestService {
         Request request = findById(id);
         validateStatusTransition(request, status, userId);
 
-        if ((status.equals("APPROVED") || status.equals("REJECTED") || status.equals("SENT_FOR_REVISION"))
-                && !request.getDestinationId().equals(userId)) {
+        if ((status.equals("APPROVED") || status.equals("REJECTED") || status.equals("SENT_FOR_REVISION") || status.equals("ACCEPTED"))
+                && (request.getDestinationId() == null || !request.getDestinationId().equals(userId))) {
             throw new SecurityException("Только адресат может менять статус заявки");
+        }
+
+        if (status.equals("CANCELLED") && !request.getRequesterId().equals(userId)) {
+            throw new SecurityException("Отменить заявку может только её автор");
         }
 
         request.setStatus(status);
@@ -80,17 +84,32 @@ public class RequestServiceImpl implements RequestService {
             request.setComment(comment);
         }
 
+        // Отменённая заявка автоматически архивируется (требование ТЗ)
+        if ("CANCELLED".equals(status)) {
+            request.setArchived(true);
+        }
+
         // Для ISSUE: при APPROVED не списываем, а переводим в WAITING_CONFIRMATION
         if ("ISSUE".equals(request.getType()) && status.equals("APPROVED")) {
             request.setStatus("WAITING_CONFIRMATION");
         }
 
-        // Для REPLENISHMENT/RECEIPT/RETURN: при APPROVED увеличиваем остатки
-        if (status.equals("APPROVED") &&
-                (request.getType().equals("REPLENISHMENT") || request.getType().equals("RECEIPT") || request.getType().equals("RETURN"))) {
+        // REPLENISHMENT — заявка на закупку: остатки НЕ меняются при одобрении.
+        // RECEIPT (поступление от поставщика) — при APPROVED создаём партию и увеличиваем остаток.
+        // RETURN (возврат с участка) — при ACCEPTED создаём партию и увеличиваем остаток.
+        boolean isReceiptApproved = "APPROVED".equals(status) && "RECEIPT".equals(request.getType());
+        boolean isReturnAccepted = "ACCEPTED".equals(status) && "RETURN".equals(request.getType());
+        if (isReceiptApproved || isReturnAccepted) {
             for (RequestItem item : request.getItems()) {
                 Material material = materialRepository.findById(item.getMaterialId()).orElse(null);
                 if (material != null) {
+                    MaterialBatch batch = new MaterialBatch();
+                    batch.setBatchNumber("BATCH-" + request.getNumber() + "-" + item.getMaterialId().substring(0, Math.min(4, item.getMaterialId().length())));
+                    batch.setReceiptDate(LocalDateTime.now());
+                    batch.setInitialQuantity(item.getQuantity());
+                    batch.setCurrentQuantity(item.getQuantity());
+                    batch.setStorageLocation(item.getExactLocation());
+                    material.getBatches().add(batch);
                     material.setCurrentStock(material.getCurrentStock() + item.getQuantity());
                     material.setLastReceiptDate(LocalDateTime.now());
                     materialRepository.save(material);
@@ -114,22 +133,33 @@ public class RequestServiceImpl implements RequestService {
                 if (!"APPROVED".equals(newStatus) && !"REJECTED".equals(newStatus) && !"CANCELLED".equals(newStatus)) {
                     throw new IllegalArgumentException("Недопустимый переход статуса для заявки на выдачу");
                 }
-            } else if ("APPROVED".equals(currentStatus)) {
-                if (!"WAITING_CONFIRMATION".equals(newStatus)) {
-                    throw new IllegalArgumentException("Одобренную заявку можно только подтвердить");
-                }
             } else if ("WAITING_CONFIRMATION".equals(currentStatus)) {
-                if (!"CONFIRMED".equals(newStatus) && !"CANCELLED".equals(newStatus)) {
-                    throw new IllegalArgumentException("Заявку можно подтвердить или отменить");
+                // WAITING_CONFIRMATION — заявка одобрена работником, ожидает подтверждения участком
+                // Подтверждение идёт через /confirm, отмена — через /status?status=CANCELLED
+                if (!"CANCELLED".equals(newStatus)) {
+                    throw new IllegalArgumentException("Одобренную заявку можно только подтвердить через /confirm или отменить");
                 }
             }
         }
 
-        if ("REPLENISHMENT".equals(type) || "RECEIPT".equals(type) || "RETURN".equals(type)) {
+        if ("REPLENISHMENT".equals(type) || "RECEIPT".equals(type)) {
             if ("UNDER_CONSIDERATION".equals(currentStatus)) {
                 if (!"APPROVED".equals(newStatus) && !"REJECTED".equals(newStatus) &&
                         !"SENT_FOR_REVISION".equals(newStatus) && !"CANCELLED".equals(newStatus)) {
                     throw new IllegalArgumentException("Недопустимый переход статуса");
+                }
+            } else if ("SENT_FOR_REVISION".equals(currentStatus)) {
+                if (!"UNDER_CONSIDERATION".equals(newStatus) && !"CANCELLED".equals(newStatus)) {
+                    throw new IllegalArgumentException("После доработки заявку можно только отправить на рассмотрение или отменить");
+                }
+            }
+        }
+
+        // RETURN (возврат с участка → работник склада): только «Принята» (ACCEPTED) или «Отменена»
+        if ("RETURN".equals(type)) {
+            if ("UNDER_CONSIDERATION".equals(currentStatus)) {
+                if (!"ACCEPTED".equals(newStatus) && !"CANCELLED".equals(newStatus)) {
+                    throw new IllegalArgumentException("Заявку на возврат можно только принять или отменить");
                 }
             }
         }
@@ -143,7 +173,10 @@ public class RequestServiceImpl implements RequestService {
             throw new IllegalArgumentException("Подтверждение получения доступно только для заявок на выдачу");
         }
         if (!"WAITING_CONFIRMATION".equals(request.getStatus())) {
-            throw new IllegalArgumentException("Подтвердить можно только заявку со статусом 'Одобрена'");
+            throw new IllegalArgumentException("Подтвердить можно только заявку со статусом 'Ожидает подтверждения'");
+        }
+        if (!request.getRequesterId().equals(userId)) {
+            throw new SecurityException("Подтвердить получение может только автор заявки");
         }
 
         // Списание материалов по FIFO из партий с заполнением warehouseId для логирования
@@ -181,8 +214,8 @@ public class RequestServiceImpl implements RequestService {
     @Override
     public Request archive(String id, String userId) {
         Request request = findById(id);
-        if ("CONFIRMED".equals(request.getStatus())) {
-            throw new IllegalArgumentException("Нельзя архивировать подтвержденную заявку");
+        if ("UNDER_CONSIDERATION".equals(request.getStatus()) || "WAITING_CONFIRMATION".equals(request.getStatus())) {
+            throw new IllegalArgumentException("Нельзя архивировать заявку в статусе 'На рассмотрении' или 'Ожидает подтверждения'");
         }
         request.setArchived(true);
         return requestRepository.save(request);

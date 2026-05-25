@@ -12,4 +12,5 @@ public class RequestItem {
     private String materialName;
     private double quantity;
     private String unit;
+    private String exactLocation; // точное размещение материала на складе
 }

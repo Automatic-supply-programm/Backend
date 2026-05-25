@@ -50,36 +50,73 @@ public class DashboardController {
                 stats.put("deficitMaterials", materialService.getDeficitMaterials().size());
             }
             case "WORKER" -> {
-                stats.put("pendingRequests", requestService.findByDestination(jwtUser.getId()).size());
+                // Список производственных участков и склад (ТЗ: «В верхней части расположен список участков и номер склада»)
+                com.nester.model.User worker = userService.findById(jwtUser.getId());
+                stats.put("warehouseId", worker.getWarehouseId());
+                stats.put("productionLineIds", worker.getProductionLineIds());
+                List<com.nester.model.Request> workerIncoming = requestService.findByDestination(jwtUser.getId());
+                // Заявки на выдачу (ISSUE) от участков, ожидающие обработки
+                stats.put("pendingRequests", workerIncoming.stream()
+                        .filter(r -> "UNDER_CONSIDERATION".equals(r.getStatus()) && !r.isArchived()
+                                  && "ISSUE".equals(r.getType())).count());
+                // Поступления и возвраты, ожидающие оформления (RECEIPT/RETURN в UNDER_CONSIDERATION + созданные самим WORKER)
+                List<com.nester.model.Request> workerCreated = requestService.findByRequester(jwtUser.getId());
+                stats.put("pendingReceipts", workerCreated.stream()
+                        .filter(r -> !r.isArchived() && "RECEIPT".equals(r.getType())
+                                  && "UNDER_CONSIDERATION".equals(r.getStatus())).count());
                 stats.put("totalMaterials", materialService.count());
                 stats.put("deficitMaterials", materialService.getDeficitMaterials().size());
             }
             case "EMPLOYEE" -> {
-                stats.put("myRequests", requestService.findByRequester(jwtUser.getId()).size());
-                stats.put("underConsideration", requestService.findByRequester(jwtUser.getId()).stream()
+                List<com.nester.model.Request> myRequests = requestService.findByRequester(jwtUser.getId());
+                stats.put("myRequests", myRequests.stream().filter(r -> !r.isArchived()).count());
+                stats.put("underConsideration", myRequests.stream()
                         .filter(r -> "UNDER_CONSIDERATION".equals(r.getStatus())).count());
+                stats.put("waitingConfirmation", myRequests.stream()
+                        .filter(r -> "WAITING_CONFIRMATION".equals(r.getStatus())).count());
+                stats.put("rejected", myRequests.stream()
+                        .filter(r -> "REJECTED".equals(r.getStatus())).count());
             }
             case "MANAGER" -> {
-                stats.put("pendingApproval", requestService.findByDestination(jwtUser.getId()).size());
+                List<com.nester.model.Request> managerIncoming = requestService.findByDestination(jwtUser.getId());
+                stats.put("totalReplenishment", managerIncoming.stream()
+                        .filter(r -> "REPLENISHMENT".equals(r.getType()) && !r.isArchived()).count());
+                stats.put("pendingApproval", managerIncoming.stream()
+                        .filter(r -> "UNDER_CONSIDERATION".equals(r.getStatus()) && !r.isArchived()).count());
+                stats.put("approved", managerIncoming.stream()
+                        .filter(r -> "APPROVED".equals(r.getStatus()) && !r.isArchived()).count());
+                stats.put("rejected", managerIncoming.stream()
+                        .filter(r -> "REJECTED".equals(r.getStatus()) && !r.isArchived()).count());
                 stats.put("deficitMaterials", materialService.getDeficitMaterials().size());
+                // Список подконтрольных складов (ТЗ: «В верхней части список подконтрольных ему складов»)
+                com.nester.model.User manager = userService.findById(jwtUser.getId());
+                stats.put("managedWarehouseIds", manager.getManagedWarehouseIds());
             }
         }
         objectMapper.writeValue(response.getWriter(), new ResponseResult<>(null, stats));
     }
 
-    // Новый эндпоинт для таблицы "Последние действия пользователей" (требование ТЗ для админа)
+    // Таблица "Последние действия пользователей" (ADMIN) / "Последние складские операции" (WORKER)
     @GetMapping("/recent")
     public void getRecentActions(@RequestParam(defaultValue = "10") int limit,
                                  Authentication auth, HttpServletResponse response) throws IOException {
         response.setContentType("application/json;charset=utf-8");
         JwtUser jwtUser = (JwtUser) auth.getPrincipal();
         String role = jwtUser.getAuthorities().iterator().next().getAuthority().replace("ROLE_", "");
-        if (!"ADMIN".equals(role)) {
+
+        List<EventLog> recentEvents;
+        if ("ADMIN".equals(role)) {
+            // Администратор видит все события
+            recentEvents = eventLogService.findAllWithFilters(null, null, null, null);
+        } else if ("WORKER".equals(role)) {
+            // Работник склада видит только события по своему складу (связанные с его userId)
+            recentEvents = eventLogService.findAllWithFilters(jwtUser.getId(), null, null, null);
+        } else {
             response.setStatus(HttpStatus.FORBIDDEN.value());
             objectMapper.writeValue(response.getWriter(), new ResponseResult<>("Недостаточно прав", null));
             return;
         }
-        List<EventLog> recentEvents = eventLogService.findAllWithFilters(null, null, null, null);
+
         if (recentEvents.size() > limit) {
             recentEvents = recentEvents.subList(0, limit);
         }

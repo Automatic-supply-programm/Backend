@@ -31,17 +31,19 @@ public class ManagerController {
     public void getEventLogsForManager(Authentication auth,
                                        @RequestParam(required = false) String startDate,
                                        @RequestParam(required = false) String endDate,
+                                       @RequestParam(required = false) String eventType,
+                                       @RequestParam(required = false) String userId,
                                        HttpServletResponse response) throws IOException {
         response.setContentType("application/json;charset=utf-8");
         JwtUser jwtUser = (JwtUser) auth.getPrincipal();
         User manager = userService.findById(jwtUser.getId());
         List<String> managedWarehouseIds = manager.getManagedWarehouseIds();
         if (managedWarehouseIds == null || managedWarehouseIds.isEmpty()) {
-            objectMapper.writeValue(response.getWriter(), new ResponseResult<>("Нет подконтрольных складов", List.of()));
+            objectMapper.writeValue(response.getWriter(), new ResponseResult<>(null, List.of()));
             return;
         }
 
-        List<EventLog> allEvents = eventLogService.findAllWithFilters(null, null, startDate, endDate);
+        List<EventLog> allEvents = eventLogService.findAllWithFilters(userId, eventType, startDate, endDate);
         List<EventLog> filtered = allEvents.stream()
                 .filter(e -> e.getWarehouseId() != null && managedWarehouseIds.contains(e.getWarehouseId()))
                 .collect(Collectors.toList());

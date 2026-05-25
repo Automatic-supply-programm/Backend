@@ -37,6 +37,7 @@ public class MaterialController {
                        @RequestParam(required = false) String warehouseId,
                        @RequestParam(required = false) String status,
                        HttpServletResponse response) throws IOException {
+        response.setContentType("application/json;charset=utf-8");
         List<Material> materials = materialService.findAll(archived);
         if (search != null && !search.isEmpty()) {
             materials = materials.stream()
@@ -85,7 +86,7 @@ public class MaterialController {
             EventLog eventLog = new EventLog();
             eventLog.setTimestamp(LocalDateTime.now());
             eventLog.setUserId(jwtUser.getId());
-            eventLog.setUserFullName(jwtUser.getUsername());
+            eventLog.setUserFullName(jwtUser.getFullName());
             eventLog.setUserRole(jwtUser.getAuthorities().iterator().next().getAuthority());
             eventLog.setEventType("MATERIAL_CREATED");
             eventLog.setObjectType("MATERIAL");
@@ -113,7 +114,7 @@ public class MaterialController {
             EventLog eventLog = new EventLog();
             eventLog.setTimestamp(LocalDateTime.now());
             eventLog.setUserId(jwtUser.getId());
-            eventLog.setUserFullName(jwtUser.getUsername());
+            eventLog.setUserFullName(jwtUser.getFullName());
             eventLog.setUserRole(jwtUser.getAuthorities().iterator().next().getAuthority());
             eventLog.setEventType("MATERIAL_UPDATED");
             eventLog.setObjectType("MATERIAL");
@@ -142,7 +143,7 @@ public class MaterialController {
             EventLog eventLog = new EventLog();
             eventLog.setTimestamp(LocalDateTime.now());
             eventLog.setUserId(jwtUser.getId());
-            eventLog.setUserFullName(jwtUser.getUsername());
+            eventLog.setUserFullName(jwtUser.getFullName());
             eventLog.setUserRole(jwtUser.getAuthorities().iterator().next().getAuthority());
             eventLog.setEventType("BATCH_RECEIVED");
             eventLog.setObjectType("BATCH");
@@ -169,7 +170,7 @@ public class MaterialController {
         EventLog eventLog = new EventLog();
         eventLog.setTimestamp(LocalDateTime.now());
         eventLog.setUserId(jwtUser.getId());
-        eventLog.setUserFullName(jwtUser.getUsername());
+        eventLog.setUserFullName(jwtUser.getFullName());
         eventLog.setUserRole(jwtUser.getAuthorities().iterator().next().getAuthority());
         eventLog.setEventType("MATERIAL_ARCHIVED");
         eventLog.setObjectType("MATERIAL");

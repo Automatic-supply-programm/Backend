@@ -45,15 +45,23 @@ public class RequestController {
 
     // Входящие заявки (для WORKER и MANAGER) с фильтрацией
     @GetMapping("/incoming")
-    public void getIncoming(@RequestParam(required = false) String search,
+    public void getIncoming(@RequestParam(defaultValue = "false") boolean archived,
+                            @RequestParam(required = false) String search,
                             @RequestParam(required = false) String type,
                             @RequestParam(required = false) String status,
                             @RequestParam(required = false) String startDate,
                             @RequestParam(required = false) String endDate,
+                            @RequestParam(required = false) String sourceId,
                             Authentication auth, HttpServletResponse response) throws IOException {
         response.setContentType("application/json;charset=utf-8");
         JwtUser jwtUser = (JwtUser) auth.getPrincipal();
         List<Request> requests = requestService.findByDestination(jwtUser.getId());
+        if (!archived) {
+            requests = requests.stream().filter(r -> !r.isArchived()).collect(Collectors.toList());
+        }
+        if (sourceId != null && !sourceId.isEmpty()) {
+            requests = requests.stream().filter(r -> sourceId.equals(r.getSourceId())).collect(Collectors.toList());
+        }
         requests = filterRequests(requests, search, type, status, startDate, endDate);
         objectMapper.writeValue(response.getWriter(), new ResponseResult<>(null, requests));
     }
@@ -66,6 +74,7 @@ public class RequestController {
                                @RequestParam(required = false) String status,
                                @RequestParam(required = false) String startDate,
                                @RequestParam(required = false) String endDate,
+                               @RequestParam(required = false) String sourceId,
                                Authentication auth, HttpServletResponse response) throws IOException {
         response.setContentType("application/json;charset=utf-8");
         JwtUser jwtUser = (JwtUser) auth.getPrincipal();
@@ -75,6 +84,9 @@ public class RequestController {
             return;
         }
         List<Request> requests = requestService.findAll(archived);
+        if (sourceId != null && !sourceId.isEmpty()) {
+            requests = requests.stream().filter(r -> sourceId.equals(r.getSourceId())).collect(Collectors.toList());
+        }
         requests = filterRequests(requests, search, type, status, startDate, endDate);
         objectMapper.writeValue(response.getWriter(), new ResponseResult<>(null, requests));
     }
@@ -84,9 +96,9 @@ public class RequestController {
                                          String startDate, String endDate) {
         if (search != null && !search.isEmpty()) {
             requests = requests.stream()
-                    .filter(r -> r.getNumber().contains(search) ||
-                            r.getItems().stream().anyMatch(i -> i.getMaterialName().contains(search)) ||
-                            r.getRequesterName().contains(search))
+                    .filter(r -> (r.getNumber() != null && r.getNumber().contains(search)) ||
+                            (r.getRequesterName() != null && r.getRequesterName().contains(search)) ||
+                            r.getItems().stream().anyMatch(i -> i.getMaterialName() != null && i.getMaterialName().contains(search)))
                     .collect(Collectors.toList());
         }
         if (type != null && !type.isEmpty()) {
@@ -126,7 +138,7 @@ public class RequestController {
         try {
             JwtUser jwtUser = (JwtUser) auth.getPrincipal();
             request.setRequesterId(jwtUser.getId());
-            request.setRequesterName(jwtUser.getUsername());
+            request.setRequesterName(jwtUser.getFullName());
             request.setRequesterRole(jwtUser.getAuthorities().iterator().next().getAuthority().replace("ROLE_", ""));
 
             Request created = requestService.create(request);
@@ -134,12 +146,13 @@ public class RequestController {
             EventLog eventLog = new EventLog();
             eventLog.setTimestamp(LocalDateTime.now());
             eventLog.setUserId(jwtUser.getId());
-            eventLog.setUserFullName(jwtUser.getUsername());
+            eventLog.setUserFullName(jwtUser.getFullName());
             eventLog.setUserRole(jwtUser.getAuthorities().iterator().next().getAuthority());
             eventLog.setEventType("REQUEST_CREATED");
             eventLog.setObjectType("REQUEST");
             eventLog.setObjectId(created.getId());
             eventLog.setObjectNumber(created.getNumber());
+            eventLog.setWarehouseId(created.getSourceId());
             eventLog.setDescription("Создана заявка типа " + created.getType() + " от " + created.getRequesterName());
             eventLog.setResult("CREATED");
             eventLogService.save(eventLog);
@@ -162,7 +175,7 @@ public class RequestController {
             EventLog eventLog = new EventLog();
             eventLog.setTimestamp(LocalDateTime.now());
             eventLog.setUserId(jwtUser.getId());
-            eventLog.setUserFullName(jwtUser.getUsername());
+            eventLog.setUserFullName(jwtUser.getFullName());
             eventLog.setUserRole(jwtUser.getAuthorities().iterator().next().getAuthority());
             eventLog.setEventType("REQUEST_UPDATED");
             eventLog.setObjectType("REQUEST");
@@ -194,12 +207,13 @@ public class RequestController {
             EventLog eventLog = new EventLog();
             eventLog.setTimestamp(LocalDateTime.now());
             eventLog.setUserId(jwtUser.getId());
-            eventLog.setUserFullName(jwtUser.getUsername());
+            eventLog.setUserFullName(jwtUser.getFullName());
             eventLog.setUserRole(jwtUser.getAuthorities().iterator().next().getAuthority());
             eventLog.setEventType("REQUEST_STATUS_CHANGED");
             eventLog.setObjectType("REQUEST");
             eventLog.setObjectId(updated.getId());
             eventLog.setObjectNumber(updated.getNumber());
+            eventLog.setWarehouseId(updated.getSourceId());
             eventLog.setDescription("Изменен статус заявки " + updated.getNumber() + " на " + status);
             if (comment != null) {
                 eventLog.setDescription(eventLog.getDescription() + ". Комментарий: " + comment);
@@ -225,18 +239,19 @@ public class RequestController {
             EventLog eventLog = new EventLog();
             eventLog.setTimestamp(LocalDateTime.now());
             eventLog.setUserId(jwtUser.getId());
-            eventLog.setUserFullName(jwtUser.getUsername());
+            eventLog.setUserFullName(jwtUser.getFullName());
             eventLog.setUserRole(jwtUser.getAuthorities().iterator().next().getAuthority());
             eventLog.setEventType("RECEIPT_CONFIRMED");
             eventLog.setObjectType("REQUEST");
             eventLog.setObjectId(updated.getId());
             eventLog.setObjectNumber(updated.getNumber());
+            eventLog.setWarehouseId(updated.getSourceId());
             eventLog.setDescription("Подтверждено получение материалов по заявке " + updated.getNumber());
             eventLog.setResult("CONFIRMED");
             eventLogService.save(eventLog);
 
             objectMapper.writeValue(response.getWriter(), new ResponseResult<>(null, updated));
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException | SecurityException e) {
             response.setStatus(HttpStatus.BAD_REQUEST.value());
             objectMapper.writeValue(response.getWriter(), new ResponseResult<>(e.getMessage(), null));
         }
@@ -253,7 +268,7 @@ public class RequestController {
             EventLog eventLog = new EventLog();
             eventLog.setTimestamp(LocalDateTime.now());
             eventLog.setUserId(jwtUser.getId());
-            eventLog.setUserFullName(jwtUser.getUsername());
+            eventLog.setUserFullName(jwtUser.getFullName());
             eventLog.setUserRole(jwtUser.getAuthorities().iterator().next().getAuthority());
             eventLog.setEventType("REQUEST_ARCHIVED");
             eventLog.setObjectType("REQUEST");

@@ -50,12 +50,27 @@ public class UserServiceImpl implements UserService {
     @Override
     public User update(String id, User user) {
         User existing = findById(id);
-        existing.setLogin(user.getLogin());
-        existing.setFullName(user.getFullName());
+        if (user.getLogin() != null && !user.getLogin().isEmpty()) {
+            existing.setLogin(user.getLogin());
+        }
+        if (user.getFullName() != null && !user.getFullName().isEmpty()) {
+            existing.setFullName(user.getFullName());
+        }
         if (user.getPassword() != null && !user.getPassword().isEmpty()) {
             existing.setPassword(passwordEncoder.encode(user.getPassword()));
         }
-        // не обновляем другие поля (role, активность, склады) — это делается через отдельные методы
+        if (user.getRole() != null && !user.getRole().isEmpty()) {
+            existing.setRole(user.getRole());
+        }
+        if (user.getWarehouseId() != null) {
+            existing.setWarehouseId(user.getWarehouseId());
+        }
+        if (user.getProductionLineIds() != null) {
+            existing.setProductionLineIds(user.getProductionLineIds());
+        }
+        if (user.getManagedWarehouseIds() != null) {
+            existing.setManagedWarehouseIds(user.getManagedWarehouseIds());
+        }
         return userRepository.save(existing);
     }
 
