@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/dashboard")
@@ -109,8 +110,15 @@ public class DashboardController {
             // Администратор видит все события
             recentEvents = eventLogService.findAllWithFilters(null, null, null, null);
         } else if ("WORKER".equals(role)) {
-            // Работник склада видит только события по своему складу (связанные с его userId)
-            recentEvents = eventLogService.findAllWithFilters(jwtUser.getId(), null, null, null);
+            // Работник видит: свои события + события по его складу (входящие заявки от участков и т.д.)
+            com.nester.model.User worker = userService.findById(jwtUser.getId());
+            String workerWarehouseId = worker.getWarehouseId();
+            List<EventLog> allEvents = eventLogService.findAllWithFilters(null, null, null, null);
+            final String wId = jwtUser.getId();
+            recentEvents = allEvents.stream()
+                    .filter(e -> wId.equals(e.getUserId()) ||
+                                 (workerWarehouseId != null && workerWarehouseId.equals(e.getWarehouseId())))
+                    .collect(Collectors.toList());
         } else {
             response.setStatus(HttpStatus.FORBIDDEN.value());
             objectMapper.writeValue(response.getWriter(), new ResponseResult<>("Недостаточно прав", null));

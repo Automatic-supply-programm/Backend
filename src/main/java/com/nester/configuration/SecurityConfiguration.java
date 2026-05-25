@@ -64,13 +64,19 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
                 .antMatchers(HttpMethod.POST, "/materials/*/batch").hasAnyRole("ADMIN", "WORKER")
 
                 // Заявки
-                .antMatchers(HttpMethod.GET, "/requests/incoming").hasAnyRole("WORKER", "MANAGER")
+                .antMatchers(HttpMethod.GET, "/requests/incoming").hasAnyRole("WORKER", "MANAGER", "ADMIN")
                 .antMatchers(HttpMethod.GET, "/requests/all").hasRole("ADMIN")
                 .antMatchers(HttpMethod.POST, "/requests").authenticated()
                 .antMatchers(HttpMethod.PUT, "/requests/**").authenticated()
                 .antMatchers(HttpMethod.POST, "/requests/*/status").authenticated()
                 .antMatchers(HttpMethod.POST, "/requests/*/confirm").hasRole("EMPLOYEE")
                 .antMatchers(HttpMethod.POST, "/requests/*/archive").authenticated()
+
+                // Заказы (справочник для RECEIPT)
+                .antMatchers(HttpMethod.GET, "/orders/**").authenticated()
+                .antMatchers(HttpMethod.POST, "/orders/**").authenticated()
+                .antMatchers(HttpMethod.PUT, "/orders/**").hasAnyRole("ADMIN", "MANAGER")
+                .antMatchers(HttpMethod.DELETE, "/orders/**").hasRole("ADMIN")
 
                 // Пользователь
                 .antMatchers(HttpMethod.GET, "/user/me").authenticated()

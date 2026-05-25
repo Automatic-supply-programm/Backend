@@ -7,8 +7,10 @@ import com.nester.model.Material;
 import com.nester.model.MaterialBatch;
 import com.nester.model.EventLog;
 import com.nester.security.jwt.JwtUser;
+import com.nester.model.User;
 import com.nester.service.MaterialService;
 import com.nester.service.EventLogService;
+import com.nester.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
@@ -18,6 +20,7 @@ import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -28,17 +31,22 @@ import java.util.stream.Collectors;
 public class MaterialController {
     private final MaterialService materialService;
     private final EventLogService eventLogService;
+    private final UserService userService;
     private final ObjectMapper objectMapper;
 
     @GetMapping
     public void getAll(@RequestParam(defaultValue = "false") boolean archived,
+                       @RequestParam(defaultValue = "false") boolean onlyArchived,
                        @RequestParam(required = false) String search,
                        @RequestParam(required = false) String category,
                        @RequestParam(required = false) String warehouseId,
                        @RequestParam(required = false) String status,
                        HttpServletResponse response) throws IOException {
         response.setContentType("application/json;charset=utf-8");
-        List<Material> materials = materialService.findAll(archived);
+        List<Material> materials = materialService.findAll(archived || onlyArchived);
+        if (onlyArchived) {
+            materials = materials.stream().filter(Material::isArchived).collect(Collectors.toList());
+        }
         if (search != null && !search.isEmpty()) {
             materials = materials.stream()
                     .filter(m -> m.getArticle().contains(search) || m.getName().contains(search))
@@ -79,15 +87,29 @@ public class MaterialController {
     public void create(@Valid @RequestBody Material material, Authentication auth, HttpServletResponse response) throws IOException {
         response.setContentType("application/json;charset=utf-8");
         try {
+            JwtUser jwtUser = (JwtUser) auth.getPrincipal();
+            String userRole = jwtUser.getAuthorities().iterator().next().getAuthority();
+            // WORKER автоматически привязывает материал к своему складу
+            if ("ROLE_WORKER".equals(userRole)) {
+                User worker = userService.findById(jwtUser.getId());
+                if (worker.getWarehouseId() != null) {
+                    List<String> warehouses = material.getWarehouses() != null
+                            ? new ArrayList<>(material.getWarehouses())
+                            : new ArrayList<>();
+                    if (!warehouses.contains(worker.getWarehouseId())) {
+                        warehouses.add(worker.getWarehouseId());
+                    }
+                    material.setWarehouses(warehouses);
+                }
+            }
             Material created = materialService.create(material);
 
             // Логируем создание
-            JwtUser jwtUser = (JwtUser) auth.getPrincipal();
             EventLog eventLog = new EventLog();
             eventLog.setTimestamp(LocalDateTime.now());
             eventLog.setUserId(jwtUser.getId());
             eventLog.setUserFullName(jwtUser.getFullName());
-            eventLog.setUserRole(jwtUser.getAuthorities().iterator().next().getAuthority());
+            eventLog.setUserRole(jwtUser.getAuthorities().iterator().next().getAuthority().replace("ROLE_", ""));
             eventLog.setEventType("MATERIAL_CREATED");
             eventLog.setObjectType("MATERIAL");
             eventLog.setObjectId(created.getId());
@@ -115,7 +137,7 @@ public class MaterialController {
             eventLog.setTimestamp(LocalDateTime.now());
             eventLog.setUserId(jwtUser.getId());
             eventLog.setUserFullName(jwtUser.getFullName());
-            eventLog.setUserRole(jwtUser.getAuthorities().iterator().next().getAuthority());
+            eventLog.setUserRole(jwtUser.getAuthorities().iterator().next().getAuthority().replace("ROLE_", ""));
             eventLog.setEventType("MATERIAL_UPDATED");
             eventLog.setObjectType("MATERIAL");
             eventLog.setObjectId(updated.getId());
@@ -144,11 +166,13 @@ public class MaterialController {
             eventLog.setTimestamp(LocalDateTime.now());
             eventLog.setUserId(jwtUser.getId());
             eventLog.setUserFullName(jwtUser.getFullName());
-            eventLog.setUserRole(jwtUser.getAuthorities().iterator().next().getAuthority());
+            eventLog.setUserRole(jwtUser.getAuthorities().iterator().next().getAuthority().replace("ROLE_", ""));
             eventLog.setEventType("BATCH_RECEIVED");
             eventLog.setObjectType("BATCH");
             eventLog.setObjectId(updated.getId());
             eventLog.setObjectNumber(batch.getBatchNumber());
+            eventLog.setMaterialName(updated.getName());
+            eventLog.setQuantity(batch.getInitialQuantity());
             eventLog.setDescription("Поступление партии материала: " + updated.getName() + ", кол-во: " + batch.getInitialQuantity());
             eventLog.setResult("RECEIVED");
             eventLogService.save(eventLog);
@@ -171,7 +195,7 @@ public class MaterialController {
         eventLog.setTimestamp(LocalDateTime.now());
         eventLog.setUserId(jwtUser.getId());
         eventLog.setUserFullName(jwtUser.getFullName());
-        eventLog.setUserRole(jwtUser.getAuthorities().iterator().next().getAuthority());
+        eventLog.setUserRole(jwtUser.getAuthorities().iterator().next().getAuthority().replace("ROLE_", ""));
         eventLog.setEventType("MATERIAL_ARCHIVED");
         eventLog.setObjectType("MATERIAL");
         eventLog.setObjectId(deleted.getId());

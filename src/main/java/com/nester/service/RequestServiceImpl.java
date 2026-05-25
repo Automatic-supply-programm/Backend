@@ -5,8 +5,10 @@ import com.nester.model.Material;
 import com.nester.model.MaterialBatch;
 import com.nester.model.Request;
 import com.nester.model.RequestItem;
+import com.nester.model.User;
 import com.nester.repository.MaterialRepository;
 import com.nester.repository.RequestRepository;
+import com.nester.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +23,7 @@ import java.util.stream.Collectors;
 public class RequestServiceImpl implements RequestService {
     private final RequestRepository requestRepository;
     private final MaterialRepository materialRepository;
+    private final UserRepository userRepository;
 
     @Override
     public List<Request> findAll(boolean includeArchived) {
@@ -38,6 +41,14 @@ public class RequestServiceImpl implements RequestService {
 
     @Override
     public Request create(Request request) {
+        // Проверяем, что destinationId ссылается на реального активного пользователя
+        if (request.getDestinationId() != null && !request.getDestinationId().isEmpty()) {
+            User destination = userRepository.findById(request.getDestinationId())
+                    .filter(u -> !u.isDeleted() && u.isActive())
+                    .orElseThrow(() -> new IllegalArgumentException("Получатель с указанным ID не найден или неактивен"));
+            // Обновляем имя получателя из актуальных данных БД
+            request.setDestinationName(destination.getFullName());
+        }
         request.setNumber("REQ-" + System.currentTimeMillis() + "-" + UUID.randomUUID().toString().substring(0, 4));
         request.setStatus("UNDER_CONSIDERATION");
         request.setCreatedDate(LocalDateTime.now());
@@ -46,9 +57,9 @@ public class RequestServiceImpl implements RequestService {
     }
 
     @Override
-    public Request update(String id, Request request, String userId) {
+    public Request update(String id, Request request, String userId, String userRole) {
         Request existing = findById(id);
-        if (!existing.getRequesterId().equals(userId)) {
+        if (!"ROLE_ADMIN".equals(userRole) && !existing.getRequesterId().equals(userId)) {
             throw new SecurityException("Нельзя редактировать чужую заявку");
         }
         if (!"UNDER_CONSIDERATION".equals(existing.getStatus()) &&
@@ -66,16 +77,18 @@ public class RequestServiceImpl implements RequestService {
 
     @Override
     @Transactional
-    public Request changeStatus(String id, String status, String comment, String userId, String userName) {
+    public Request changeStatus(String id, String status, String comment, String userId, String userName, String userRole) {
         Request request = findById(id);
         validateStatusTransition(request, status, userId);
 
-        if ((status.equals("APPROVED") || status.equals("REJECTED") || status.equals("SENT_FOR_REVISION") || status.equals("ACCEPTED"))
+        boolean isAdmin = "ROLE_ADMIN".equals(userRole);
+
+        if (!isAdmin && (status.equals("APPROVED") || status.equals("REJECTED") || status.equals("SENT_FOR_REVISION") || status.equals("ACCEPTED"))
                 && (request.getDestinationId() == null || !request.getDestinationId().equals(userId))) {
             throw new SecurityException("Только адресат может менять статус заявки");
         }
 
-        if (status.equals("CANCELLED") && !request.getRequesterId().equals(userId)) {
+        if (!isAdmin && status.equals("CANCELLED") && !request.getRequesterId().equals(userId)) {
             throw new SecurityException("Отменить заявку может только её автор");
         }
 
@@ -167,7 +180,7 @@ public class RequestServiceImpl implements RequestService {
 
     @Override
     @Transactional
-    public Request confirmReceipt(String id, String userId, String userName) {
+    public Request confirmReceipt(String id, String userId, String userName, String userRole) {
         Request request = findById(id);
         if (!"ISSUE".equals(request.getType())) {
             throw new IllegalArgumentException("Подтверждение получения доступно только для заявок на выдачу");
@@ -175,7 +188,7 @@ public class RequestServiceImpl implements RequestService {
         if (!"WAITING_CONFIRMATION".equals(request.getStatus())) {
             throw new IllegalArgumentException("Подтвердить можно только заявку со статусом 'Ожидает подтверждения'");
         }
-        if (!request.getRequesterId().equals(userId)) {
+        if (!"ROLE_ADMIN".equals(userRole) && !request.getRequesterId().equals(userId)) {
             throw new SecurityException("Подтвердить получение может только автор заявки");
         }
 

@@ -147,7 +147,7 @@ public class RequestController {
             eventLog.setTimestamp(LocalDateTime.now());
             eventLog.setUserId(jwtUser.getId());
             eventLog.setUserFullName(jwtUser.getFullName());
-            eventLog.setUserRole(jwtUser.getAuthorities().iterator().next().getAuthority());
+            eventLog.setUserRole(jwtUser.getAuthorities().iterator().next().getAuthority().replace("ROLE_", ""));
             eventLog.setEventType("REQUEST_CREATED");
             eventLog.setObjectType("REQUEST");
             eventLog.setObjectId(created.getId());
@@ -170,13 +170,14 @@ public class RequestController {
         response.setContentType("application/json;charset=utf-8");
         try {
             JwtUser jwtUser = (JwtUser) auth.getPrincipal();
-            Request updated = requestService.update(id, request, jwtUser.getId());
+            String userRole = jwtUser.getAuthorities().iterator().next().getAuthority();
+            Request updated = requestService.update(id, request, jwtUser.getId(), userRole);
 
             EventLog eventLog = new EventLog();
             eventLog.setTimestamp(LocalDateTime.now());
             eventLog.setUserId(jwtUser.getId());
             eventLog.setUserFullName(jwtUser.getFullName());
-            eventLog.setUserRole(jwtUser.getAuthorities().iterator().next().getAuthority());
+            eventLog.setUserRole(userRole.replace("ROLE_", ""));
             eventLog.setEventType("REQUEST_UPDATED");
             eventLog.setObjectType("REQUEST");
             eventLog.setObjectId(updated.getId());
@@ -202,13 +203,14 @@ public class RequestController {
         response.setContentType("application/json;charset=utf-8");
         try {
             JwtUser jwtUser = (JwtUser) auth.getPrincipal();
-            Request updated = requestService.changeStatus(id, status, comment, jwtUser.getId(), jwtUser.getUsername());
+            String userRole = jwtUser.getAuthorities().iterator().next().getAuthority();
+            Request updated = requestService.changeStatus(id, status, comment, jwtUser.getId(), jwtUser.getUsername(), userRole);
 
             EventLog eventLog = new EventLog();
             eventLog.setTimestamp(LocalDateTime.now());
             eventLog.setUserId(jwtUser.getId());
             eventLog.setUserFullName(jwtUser.getFullName());
-            eventLog.setUserRole(jwtUser.getAuthorities().iterator().next().getAuthority());
+            eventLog.setUserRole(userRole.replace("ROLE_", ""));
             eventLog.setEventType("REQUEST_STATUS_CHANGED");
             eventLog.setObjectType("REQUEST");
             eventLog.setObjectId(updated.getId());
@@ -219,6 +221,14 @@ public class RequestController {
                 eventLog.setDescription(eventLog.getDescription() + ". Комментарий: " + comment);
             }
             eventLog.setResult(status);
+            if (updated.getItems() != null && !updated.getItems().isEmpty()) {
+                double total = updated.getItems().stream().mapToDouble(com.nester.model.RequestItem::getQuantity).sum();
+                String matName = updated.getItems().size() == 1
+                        ? updated.getItems().get(0).getMaterialName()
+                        : updated.getItems().size() + " наим.";
+                eventLog.setMaterialName(matName);
+                eventLog.setQuantity(total);
+            }
             eventLogService.save(eventLog);
 
             objectMapper.writeValue(response.getWriter(), new ResponseResult<>(null, updated));
@@ -234,20 +244,29 @@ public class RequestController {
         response.setContentType("application/json;charset=utf-8");
         try {
             JwtUser jwtUser = (JwtUser) auth.getPrincipal();
-            Request updated = requestService.confirmReceipt(id, jwtUser.getId(), jwtUser.getUsername());
+            String userRole = jwtUser.getAuthorities().iterator().next().getAuthority();
+            Request updated = requestService.confirmReceipt(id, jwtUser.getId(), jwtUser.getUsername(), userRole);
 
             EventLog eventLog = new EventLog();
             eventLog.setTimestamp(LocalDateTime.now());
             eventLog.setUserId(jwtUser.getId());
             eventLog.setUserFullName(jwtUser.getFullName());
-            eventLog.setUserRole(jwtUser.getAuthorities().iterator().next().getAuthority());
-            eventLog.setEventType("RECEIPT_CONFIRMED");
+            eventLog.setUserRole(userRole.replace("ROLE_", ""));
+            eventLog.setEventType("MATERIALS_ISSUED");
             eventLog.setObjectType("REQUEST");
             eventLog.setObjectId(updated.getId());
             eventLog.setObjectNumber(updated.getNumber());
             eventLog.setWarehouseId(updated.getSourceId());
-            eventLog.setDescription("Подтверждено получение материалов по заявке " + updated.getNumber());
+            eventLog.setDescription("Выданы материалы по заявке " + updated.getNumber());
             eventLog.setResult("CONFIRMED");
+            if (updated.getItems() != null && !updated.getItems().isEmpty()) {
+                double total = updated.getItems().stream().mapToDouble(com.nester.model.RequestItem::getQuantity).sum();
+                String matName = updated.getItems().size() == 1
+                        ? updated.getItems().get(0).getMaterialName()
+                        : updated.getItems().size() + " наим.";
+                eventLog.setMaterialName(matName);
+                eventLog.setQuantity(total);
+            }
             eventLogService.save(eventLog);
 
             objectMapper.writeValue(response.getWriter(), new ResponseResult<>(null, updated));
@@ -269,7 +288,7 @@ public class RequestController {
             eventLog.setTimestamp(LocalDateTime.now());
             eventLog.setUserId(jwtUser.getId());
             eventLog.setUserFullName(jwtUser.getFullName());
-            eventLog.setUserRole(jwtUser.getAuthorities().iterator().next().getAuthority());
+            eventLog.setUserRole(jwtUser.getAuthorities().iterator().next().getAuthority().replace("ROLE_", ""));
             eventLog.setEventType("REQUEST_ARCHIVED");
             eventLog.setObjectType("REQUEST");
             eventLog.setObjectId(archived.getId());

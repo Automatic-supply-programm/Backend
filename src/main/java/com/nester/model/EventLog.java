@@ -27,4 +27,7 @@ public class EventLog {
     // дополнительные поля для фильтрации менеджером
     private String warehouseId;      // ID склада, к которому относится событие
     private String productionLineId; // ID участка, если применимо
+    // поля для таблицы складских операций (WORKER dashboard)
+    private String materialName;
+    private Double quantity;
 }
