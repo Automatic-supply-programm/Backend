@@ -37,7 +37,7 @@ public class MaterialController {
                        @RequestParam(required = false) String warehouseId,
                        @RequestParam(required = false) String status,
                        HttpServletResponse response) throws IOException {
-        List<Material> materials = materialService.findAll(!archived);
+        List<Material> materials = materialService.findAll(archived);
         if (search != null && !search.isEmpty()) {
             materials = materials.stream()
                     .filter(m -> m.getArticle().contains(search) || m.getName().contains(search))

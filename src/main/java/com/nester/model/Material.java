@@ -1,6 +1,5 @@
 package com.nester.model;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -45,9 +44,7 @@ public class Material {
 
     private List<String> warehouses;
     private String description;
-    @JsonFormat(pattern = "dd.MM.yyyy HH:mm:ss")
     private LocalDateTime lastReceiptDate;
-    @JsonFormat(pattern = "dd.MM.yyyy HH:mm:ss")
     private LocalDateTime lastIssueDate;
     private List<MaterialBatch> batches = new ArrayList<>();
     private boolean archived = false;

@@ -59,9 +59,10 @@ public class MaterialServiceImpl implements MaterialService {
     public Material addBatch(String id, MaterialBatch batch) {
         Material material = findById(id);
         batch.setReceiptDate(LocalDateTime.now());
+        // Текущий остаток партии = начальное количество (будет убывать при выдачах)
+        batch.setCurrentQuantity(batch.getInitialQuantity());
         material.getBatches().add(batch);
 
-        // Обновляем общий остаток
         material.setCurrentStock(material.getCurrentStock() + batch.getInitialQuantity());
         material.setLastReceiptDate(LocalDateTime.now());
 

@@ -1,7 +1,6 @@
 // User.java (уже есть)
 package com.nester.model;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -24,9 +23,7 @@ public class User {
     private String password;
     private String role; // ADMIN, WORKER, EMPLOYEE, MANAGER
     private boolean active = true;
-    @JsonFormat(pattern = "dd.MM.yyyy HH:mm:ss")
     private LocalDateTime regDate = LocalDateTime.now();
-    @JsonFormat(pattern = "dd.MM.yyyy HH:mm:ss")
     private LocalDateTime lastLogin;
     private String warehouseId;
     private List<String> productionLineIds;

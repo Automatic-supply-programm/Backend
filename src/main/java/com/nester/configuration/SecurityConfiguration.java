@@ -38,10 +38,13 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
     @Override
     protected void configure(HttpSecurity http) throws Exception {
         http
+                .cors().and()
                 .csrf().disable()
                 .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 .and()
                 .authorizeRequests()
+                // Preflight OPTIONS — всегда разрешён
+                .antMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 // Публичные эндпоинты
                 .antMatchers(HttpMethod.POST, "/auth/login").permitAll()
                 .antMatchers(HttpMethod.POST, "/auth/logout").authenticated()
