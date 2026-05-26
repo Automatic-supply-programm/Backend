@@ -81,6 +81,9 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
                 // Пользователь
                 .antMatchers(HttpMethod.GET, "/user/me").authenticated()
 
+                // Остатки на производственном участке
+                .antMatchers(HttpMethod.GET, "/inventory/production-line").hasAnyRole("EMPLOYEE", "ADMIN")
+
                 // Дашборд
                 .antMatchers(HttpMethod.GET, "/dashboard/**").authenticated()
 

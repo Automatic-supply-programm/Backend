@@ -8,6 +8,7 @@ import com.nester.model.Request;
 import com.nester.security.jwt.JwtUser;
 import com.nester.service.EventLogService;
 import com.nester.service.RequestService;
+import com.nester.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
@@ -27,6 +28,7 @@ import java.util.stream.Collectors;
 public class RequestController {
     private final RequestService requestService;
     private final EventLogService eventLogService;
+    private final UserService userService;
     private final ObjectMapper objectMapper;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
@@ -256,7 +258,12 @@ public class RequestController {
             eventLog.setObjectType("REQUEST");
             eventLog.setObjectId(updated.getId());
             eventLog.setObjectNumber(updated.getNumber());
-            eventLog.setWarehouseId(updated.getSourceId());
+            try {
+                com.nester.model.User worker = userService.findById(updated.getDestinationId());
+                eventLog.setWarehouseId(worker.getWarehouseId());
+            } catch (Exception ignored) {
+                eventLog.setWarehouseId(updated.getSourceId());
+            }
             eventLog.setDescription("Выданы материалы по заявке " + updated.getNumber());
             eventLog.setResult("CONFIRMED");
             if (updated.getItems() != null && !updated.getItems().isEmpty()) {

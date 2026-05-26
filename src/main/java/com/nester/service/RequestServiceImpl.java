@@ -51,6 +51,9 @@ public class RequestServiceImpl implements RequestService {
             }
             request.setDestinationName(destination.getFullName());
         }
+        if ("RETURN".equals(request.getType()) && request.getRequesterId() != null && request.getItems() != null) {
+            validateReturnQuantities(request.getRequesterId(), request.getItems());
+        }
         request.setNumber("REQ-" + System.currentTimeMillis() + "-" + UUID.randomUUID().toString().substring(0, 4));
         request.setStatus("UNDER_CONSIDERATION");
         request.setCreatedDate(LocalDateTime.now());
@@ -124,6 +127,10 @@ public class RequestServiceImpl implements RequestService {
                     batch.setInitialQuantity(item.getQuantity());
                     batch.setCurrentQuantity(item.getQuantity());
                     batch.setStorageLocation(item.getExactLocation());
+                    batch.setReceiptActNumber(item.getReceiptActNumber());
+                    batch.setExpiryDate(item.getExpiryDate());
+                    batch.setAcceptedByUserId(userId);
+                    batch.setAcceptedByName(userName);
                     material.getBatches().add(batch);
                     material.setCurrentStock(material.getCurrentStock() + item.getQuantity());
                     material.setLastReceiptDate(LocalDateTime.now());
@@ -249,5 +256,32 @@ public class RequestServiceImpl implements RequestService {
     @Override
     public List<Request> findByDestination(String destinationId) {
         return requestRepository.findByDestinationId(destinationId);
+    }
+
+    private void validateReturnQuantities(String requesterId, List<RequestItem> returnItems) {
+        List<Request> issued = requestRepository.findByRequesterIdAndType(requesterId, "ISSUE");
+        List<Request> returned = requestRepository.findByRequesterIdAndType(requesterId, "RETURN");
+
+        Map<String, Double> available = new java.util.HashMap<>();
+        for (Request r : issued) {
+            if (!"CONFIRMED".equals(r.getStatus()) || r.getItems() == null) continue;
+            for (RequestItem item : r.getItems()) {
+                available.merge(item.getMaterialId(), item.getQuantity(), Double::sum);
+            }
+        }
+        for (Request r : returned) {
+            if (!"ACCEPTED".equals(r.getStatus()) || r.getItems() == null) continue;
+            for (RequestItem item : r.getItems()) {
+                available.merge(item.getMaterialId(), -item.getQuantity(), Double::sum);
+            }
+        }
+        for (RequestItem item : returnItems) {
+            double qty = available.getOrDefault(item.getMaterialId(), 0.0);
+            if (item.getQuantity() > qty) {
+                throw new IllegalArgumentException(
+                    "Недостаточно материала «" + item.getMaterialName() + "» на участке. " +
+                    "Доступно: " + qty + " " + item.getUnit());
+            }
+        }
     }
 }

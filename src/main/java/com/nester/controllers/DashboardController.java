@@ -88,6 +88,9 @@ public class DashboardController {
                         .filter(r -> "RECEIPT".equals(r.getType()) && !r.isArchived()).count());
                 stats.put("pendingApproval", managerIncoming.stream()
                         .filter(r -> "UNDER_CONSIDERATION".equals(r.getStatus()) && !r.isArchived()).count());
+                stats.put("pendingReceipts", managerIncoming.stream()
+                        .filter(r -> "RECEIPT".equals(r.getType())
+                                && "UNDER_CONSIDERATION".equals(r.getStatus()) && !r.isArchived()).count());
                 stats.put("approved", managerIncoming.stream()
                         .filter(r -> "APPROVED".equals(r.getStatus()) && !r.isArchived()).count());
                 stats.put("rejected", managerIncoming.stream()
