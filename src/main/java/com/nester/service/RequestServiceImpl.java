@@ -14,7 +14,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -262,7 +264,7 @@ public class RequestServiceImpl implements RequestService {
         List<Request> issued = requestRepository.findByRequesterIdAndType(requesterId, "ISSUE");
         List<Request> returned = requestRepository.findByRequesterIdAndType(requesterId, "RETURN");
 
-        Map<String, Double> available = new java.util.HashMap<>();
+        Map<String, Double> available = new HashMap<>();
         for (Request r : issued) {
             if (!"CONFIRMED".equals(r.getStatus()) || r.getItems() == null) continue;
             for (RequestItem item : r.getItems()) {
