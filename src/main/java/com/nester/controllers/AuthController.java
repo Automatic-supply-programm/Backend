@@ -48,16 +48,18 @@ public class AuthController {
             user.setLastLogin(LocalDateTime.now());
             userService.updateLastLogin(user.getId(), user.getLastLogin());  // вместо userService.update(...)
 
-            // Логируем вход
-            EventLog eventLog = new EventLog();
-            eventLog.setTimestamp(LocalDateTime.now());
-            eventLog.setUserId(user.getId());
-            eventLog.setUserFullName(user.getFullName());
-            eventLog.setUserRole(user.getRole());
-            eventLog.setEventType("LOGIN");
-            eventLog.setDescription("Пользователь вошел в систему");
-            eventLog.setResult("SUCCESS");
-            eventLogService.save(eventLog);
+            // Логируем вход только для ADMIN
+            if ("ADMIN".equals(user.getRole())) {
+                EventLog eventLog = new EventLog();
+                eventLog.setTimestamp(LocalDateTime.now());
+                eventLog.setUserId(user.getId());
+                eventLog.setUserFullName(user.getFullName());
+                eventLog.setUserRole(user.getRole());
+                eventLog.setEventType("LOGIN");
+                eventLog.setDescription("Пользователь вошел в систему");
+                eventLog.setResult("SUCCESS");
+                eventLogService.save(eventLog);
+            }
 
             String token = jwtTokenProvider.createToken(user.getId(), loginRequest.getLogin(), user.getRole());
             response.getWriter().write("{\"message\":null,\"data\":\"" + token + "\"}");
@@ -81,15 +83,19 @@ public class AuthController {
         response.setContentType("application/json;charset=utf-8");
         if (auth != null && auth.isAuthenticated()) {
             JwtUser jwtUser = (JwtUser) auth.getPrincipal();
-            EventLog eventLog = new EventLog();
-            eventLog.setTimestamp(LocalDateTime.now());
-            eventLog.setUserId(jwtUser.getId());
-            eventLog.setUserFullName(jwtUser.getFullName());
-            eventLog.setUserRole(jwtUser.getAuthorities().iterator().next().getAuthority());
-            eventLog.setEventType("LOGOUT");
-            eventLog.setDescription("Пользователь вышел из системы");
-            eventLog.setResult("SUCCESS");
-            eventLogService.save(eventLog);
+            String authority = jwtUser.getAuthorities().iterator().next().getAuthority();
+            // Логируем выход только для ADMIN
+            if ("ROLE_ADMIN".equals(authority)) {
+                EventLog eventLog = new EventLog();
+                eventLog.setTimestamp(LocalDateTime.now());
+                eventLog.setUserId(jwtUser.getId());
+                eventLog.setUserFullName(jwtUser.getFullName());
+                eventLog.setUserRole(authority.replace("ROLE_", ""));
+                eventLog.setEventType("LOGOUT");
+                eventLog.setDescription("Пользователь вышел из системы");
+                eventLog.setResult("SUCCESS");
+                eventLogService.save(eventLog);
+            }
         }
         response.getWriter().write("{\"message\":\"Выход выполнен\",\"data\":null}");
     }

@@ -78,6 +78,20 @@ public class UserController {
         objectMapper.writeValue(response.getWriter(), new ResponseResult<>(null, result));
     }
 
+    // Справочник производственных участков: уникальные productionLineId из профилей активных EMPLOYEE
+    @GetMapping("/production-lines")
+    public void getProductionLinesList(HttpServletResponse response) throws IOException {
+        response.setContentType("application/json;charset=utf-8");
+        List<String> result = userService.findAll().stream()
+                .filter(u -> u.isActive() && "EMPLOYEE".equals(u.getRole()) && u.getProductionLineIds() != null)
+                .flatMap(u -> u.getProductionLineIds().stream())
+                .filter(id -> id != null && !id.isBlank())
+                .distinct()
+                .sorted()
+                .collect(Collectors.toList());
+        objectMapper.writeValue(response.getWriter(), new ResponseResult<>(null, result));
+    }
+
     // Справочник складов: уникальные warehouseId из профилей активных работников
     @GetMapping("/warehouses")
     public void getWarehousesList(HttpServletResponse response) throws IOException {

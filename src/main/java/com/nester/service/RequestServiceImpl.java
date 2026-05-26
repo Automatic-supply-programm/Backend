@@ -46,7 +46,9 @@ public class RequestServiceImpl implements RequestService {
             User destination = userRepository.findById(request.getDestinationId())
                     .filter(u -> !u.isDeleted() && u.isActive())
                     .orElseThrow(() -> new IllegalArgumentException("Получатель с указанным ID не найден или неактивен"));
-            // Обновляем имя получателя из актуальных данных БД
+            if ("RECEIPT".equals(request.getType()) && !"MANAGER".equals(destination.getRole())) {
+                throw new IllegalArgumentException("Заявку на поступление можно направить только менеджеру");
+            }
             request.setDestinationName(destination.getFullName());
         }
         request.setNumber("REQ-" + System.currentTimeMillis() + "-" + UUID.randomUUID().toString().substring(0, 4));

@@ -6,6 +6,7 @@ import com.nester.dto.ResponseResult;
 import com.nester.model.EventLog;
 import com.nester.security.jwt.JwtUser;
 import com.nester.service.EventLogService;
+import java.util.Set;
 import com.nester.service.MaterialService;
 import com.nester.service.RequestService;
 import com.nester.service.UserService;
@@ -51,10 +52,8 @@ public class DashboardController {
                 stats.put("deficitMaterials", materialService.getDeficitMaterials().size());
             }
             case "WORKER" -> {
-                // Список производственных участков и склад (ТЗ: «В верхней части расположен список участков и номер склада»)
                 com.nester.model.User worker = userService.findById(jwtUser.getId());
                 stats.put("warehouseId", worker.getWarehouseId());
-                stats.put("productionLineIds", worker.getProductionLineIds());
                 List<com.nester.model.Request> workerIncoming = requestService.findByDestination(jwtUser.getId());
                 // Заявки на выдачу (ISSUE) от участков, ожидающие обработки
                 stats.put("pendingRequests", workerIncoming.stream()
@@ -69,6 +68,9 @@ public class DashboardController {
                 stats.put("deficitMaterials", materialService.getDeficitMaterials().size());
             }
             case "EMPLOYEE" -> {
+                com.nester.model.User employee = userService.findById(jwtUser.getId());
+                stats.put("warehouseId", employee.getWarehouseId());
+                stats.put("productionLineIds", employee.getProductionLineIds());
                 List<com.nester.model.Request> myRequests = requestService.findByRequester(jwtUser.getId());
                 stats.put("myRequests", myRequests.stream().filter(r -> !r.isArchived()).count());
                 stats.put("underConsideration", myRequests.stream()
@@ -82,6 +84,8 @@ public class DashboardController {
                 List<com.nester.model.Request> managerIncoming = requestService.findByDestination(jwtUser.getId());
                 stats.put("totalReplenishment", managerIncoming.stream()
                         .filter(r -> "REPLENISHMENT".equals(r.getType()) && !r.isArchived()).count());
+                stats.put("totalReceipts", managerIncoming.stream()
+                        .filter(r -> "RECEIPT".equals(r.getType()) && !r.isArchived()).count());
                 stats.put("pendingApproval", managerIncoming.stream()
                         .filter(r -> "UNDER_CONSIDERATION".equals(r.getStatus()) && !r.isArchived()).count());
                 stats.put("approved", managerIncoming.stream()
@@ -89,7 +93,6 @@ public class DashboardController {
                 stats.put("rejected", managerIncoming.stream()
                         .filter(r -> "REJECTED".equals(r.getStatus()) && !r.isArchived()).count());
                 stats.put("deficitMaterials", materialService.getDeficitMaterials().size());
-                // Список подконтрольных складов (ТЗ: «В верхней части список подконтрольных ему складов»)
                 com.nester.model.User manager = userService.findById(jwtUser.getId());
                 stats.put("managedWarehouseIds", manager.getManagedWarehouseIds());
             }
@@ -110,12 +113,13 @@ public class DashboardController {
             // Администратор видит все события
             recentEvents = eventLogService.findAllWithFilters(null, null, null, null);
         } else if ("WORKER".equals(role)) {
-            // Работник видит: свои события + события по его складу (входящие заявки от участков и т.д.)
+            // Работник видит только бизнес-события по своему складу (без системных)
             com.nester.model.User worker = userService.findById(jwtUser.getId());
             String workerWarehouseId = worker.getWarehouseId();
             List<EventLog> allEvents = eventLogService.findAllWithFilters(null, null, null, null);
             final String wId = jwtUser.getId();
             recentEvents = allEvents.stream()
+                    .filter(e -> !EventLogService.SYSTEM_EVENT_TYPES.contains(e.getEventType()))
                     .filter(e -> wId.equals(e.getUserId()) ||
                                  (workerWarehouseId != null && workerWarehouseId.equals(e.getWarehouseId())))
                     .collect(Collectors.toList());

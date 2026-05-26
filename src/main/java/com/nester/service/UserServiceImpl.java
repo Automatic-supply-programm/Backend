@@ -39,6 +39,10 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public User create(User user) {
+        validateRoleFields(user.getRole(), user.getWarehouseId(), user.getProductionLineIds());
+        if ("WORKER".equals(user.getRole())) {
+            user.setProductionLineIds(null);
+        }
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         try {
             return userRepository.save(user);
@@ -71,13 +75,18 @@ public class UserServiceImpl implements UserService {
         if (user.getManagedWarehouseIds() != null) {
             existing.setManagedWarehouseIds(user.getManagedWarehouseIds());
         }
+        validateRoleFields(existing.getRole(), existing.getWarehouseId(), existing.getProductionLineIds());
+        if ("WORKER".equals(existing.getRole())) {
+            existing.setProductionLineIds(null);
+        }
         return userRepository.save(existing);
     }
 
     @Override
     public User delete(String id) {
         User user = findById(id);
-        user.setDeleted(true);          // soft delete
+        user.setDeleted(true);
+        user.setLogin("__deleted__" + id + "__" + user.getLogin());
         return userRepository.save(user);
     }
 
@@ -98,5 +107,20 @@ public class UserServiceImpl implements UserService {
         User user = findById(id);
         user.setLastLogin(lastLogin);
         return userRepository.save(user);
+    }
+
+    private void validateRoleFields(String role, String warehouseId, java.util.List<String> productionLineIds) {
+        if ("WORKER".equals(role)) {
+            if (warehouseId == null || warehouseId.isBlank()) {
+                throw new IllegalArgumentException("Работнику склада необходимо указать склад");
+            }
+        } else if ("EMPLOYEE".equals(role)) {
+            if (warehouseId == null || warehouseId.isBlank()) {
+                throw new IllegalArgumentException("Сотруднику участка необходимо указать склад");
+            }
+            if (productionLineIds == null || productionLineIds.isEmpty()) {
+                throw new IllegalArgumentException("Сотруднику участка необходимо указать производственный участок");
+            }
+        }
     }
 }

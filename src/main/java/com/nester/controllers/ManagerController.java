@@ -6,6 +6,7 @@ import com.nester.model.EventLog;
 import com.nester.model.User;
 import com.nester.security.jwt.JwtUser;
 import com.nester.service.EventLogService;
+import java.util.Set;
 import com.nester.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -45,6 +46,7 @@ public class ManagerController {
 
         List<EventLog> allEvents = eventLogService.findAllWithFilters(userId, eventType, startDate, endDate);
         List<EventLog> filtered = allEvents.stream()
+                .filter(e -> !EventLogService.SYSTEM_EVENT_TYPES.contains(e.getEventType()))
                 .filter(e -> e.getWarehouseId() != null && managedWarehouseIds.contains(e.getWarehouseId()))
                 .collect(Collectors.toList());
 
