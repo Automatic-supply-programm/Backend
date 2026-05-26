@@ -22,4 +22,6 @@ public class MaterialBatch {
     private String acceptedByName;
     private String confirmedByUserId;
     private String confirmedByName;
+    // MANUAL, RECEIPT, RETURN
+    private String sourceType;
 }

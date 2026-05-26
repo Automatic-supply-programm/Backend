@@ -158,6 +158,7 @@ public class MaterialController {
         response.setContentType("application/json;charset=utf-8");
         try {
             batch.setBatchNumber("BATCH-" + System.currentTimeMillis() + "-" + UUID.randomUUID().toString().substring(0, 4));
+            if (batch.getSourceType() == null) batch.setSourceType("MANUAL");
             Material updated = materialService.addBatch(id, batch);
 
             // Логируем поступление партии

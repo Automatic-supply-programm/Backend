@@ -120,6 +120,7 @@ public class RequestServiceImpl implements RequestService {
         boolean isReceiptApproved = "APPROVED".equals(status) && "RECEIPT".equals(request.getType());
         boolean isReturnAccepted = "ACCEPTED".equals(status) && "RETURN".equals(request.getType());
         if (isReceiptApproved || isReturnAccepted) {
+            String sourceType = isReturnAccepted ? "RETURN" : "RECEIPT";
             for (RequestItem item : request.getItems()) {
                 Material material = materialRepository.findById(item.getMaterialId()).orElse(null);
                 if (material != null) {
@@ -133,6 +134,7 @@ public class RequestServiceImpl implements RequestService {
                     batch.setExpiryDate(item.getExpiryDate());
                     batch.setAcceptedByUserId(userId);
                     batch.setAcceptedByName(userName);
+                    batch.setSourceType(sourceType);
                     material.getBatches().add(batch);
                     material.setCurrentStock(material.getCurrentStock() + item.getQuantity());
                     material.setLastReceiptDate(LocalDateTime.now());
