@@ -45,6 +45,12 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
                 .authorizeRequests()
                 // Preflight OPTIONS — всегда разрешён
                 .antMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                // WebSocket (аутентификация через STOMP-заголовок в ChannelInterceptor)
+                .antMatchers("/ws/**").permitAll()
+
+                // Мессенджер
+                .antMatchers("/messages/**").authenticated()
+
                 // Публичные эндпоинты
                 .antMatchers(HttpMethod.POST, "/auth/login").permitAll()
                 .antMatchers(HttpMethod.POST, "/auth/logout").authenticated()
